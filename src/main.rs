@@ -9,6 +9,8 @@ pub mod error;
 pub mod process;
 pub mod transfer;
 
+use std::path::PathBuf;
+
 // Use common types
 use config::Config;
 // Removed unused PegasusError import, keeping Result
@@ -24,6 +26,7 @@ use tracing::{error, info};
 use dotenvy::dotenv;
 // Import EnvFilter for tracing configuration
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
+use yt_dlp::Youtube;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -49,6 +52,9 @@ async fn main() -> Result<()> {
     let _config = Config::load();
     // Log configuration loading
     info!("Configuration loaded (placeholder)");
+
+    // Install ffmpeg and yt-dlp
+    install_binaries().await?;
 
     // Create the Axum router
     let app = api::create_router();
@@ -80,5 +86,18 @@ async fn main() -> Result<()> {
             error::PegasusError::WebServerError(format!("Server failed: {}", e))
         })?;
 
+    Ok(())
+}
+
+/// Installs ffmpeg and yt-dlp binaries.
+///
+/// # Returns
+///
+/// A `Result` containing `()` on success, or a `PegasusError` on failure.
+async fn install_binaries() -> Result<()> {
+    let executables_dir = PathBuf::from("libs");
+    let output_dir = PathBuf::from("output");
+
+    Youtube::with_new_binaries(executables_dir, output_dir).await?;
     Ok(())
 }

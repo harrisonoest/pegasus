@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Get form values
     const mediaUrl = document.getElementById("mediaUrl").value;
-    const outputDir = document.getElementById("outputDir").value;
+    let outputDir = document.getElementById("outputDir").value;
 
     // Get selected options
     const selectedOptions = [];
@@ -25,8 +25,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     if (!outputDir) {
-      showStatus("Please specify an output directory", "error");
-      return;
+      showStatus("Using default output directory", "info");
+      outputDir = "/tmp/pegasus_downloads";
     }
 
     // Prepare data for submission

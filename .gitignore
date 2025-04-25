@@ -132,3 +132,7 @@ flake.lock
 ## Rust
 **/*.rs.bk
 Cargo.lock
+
+## Files
+libs
+output
