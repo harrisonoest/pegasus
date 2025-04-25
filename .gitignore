@@ -9,14 +9,22 @@
 ## File system
 .DS_Store
 desktop.ini
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 ## Editor
 *.swp
 *.swo
 Session.vim
 .cproject
+.idea/
 .idea
 *.iml
+.vscode/
 .vscode
 .project
 .vim/
@@ -26,10 +34,16 @@ Session.vim
 .settings/
 .vs/
 .dir-locals.el
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 ## Tool
 .valgrindrc
 .cargo
+
 # Included because it is part of the test case
 !/tests/run-make/thumb-none-qemu/example/.cargo
 
@@ -40,6 +54,8 @@ Session.vim
 config.mk
 config.stamp
 no_llvm_build
+config.toml
+.env
 
 ## Build
 /dl/
@@ -56,12 +72,23 @@ no_llvm_build
 /src/bootstrap/target
 /src/ci/citool/target
 /src/tools/x/target
+
 # Created by `x vendor`
 /vendor
+
 # Created by default with `src/ci/docker/run.sh`
 /obj/
+
 # Created by nix dev shell / .envrc
 src/tools/nix-dev-shell/flake.lock
+*.o
+*.rlib
+*.so
+*.dylib
+*.a
+*.dll
+*.exe
+*.pdb
 
 ## ICE reports
 rustc-ice-*.txt
@@ -71,6 +98,7 @@ rustc-ice-*.txt
 \#*
 \#*\#
 .#*
+/tmp/pegasus/
 
 ## Tags
 tags
@@ -101,4 +129,6 @@ tests/rustdoc-gui/src/**.lock
 flake.lock
 /default.nix
 
-# Before adding new lines, see the comment at the top.
+## Rust
+**/*.rs.bk
+Cargo.lock

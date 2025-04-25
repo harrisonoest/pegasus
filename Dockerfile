@@ -1,61 +1,78 @@
-# Build stage
-FROM rust:1.82 AS builder
+# Stage 1: Builder
+# Use the official Rust image as the base for building
+FROM rust:1-slim-bookworm as builder
 
-WORKDIR /app
+# Set the working directory
+WORKDIR /usr/src/pegasus
 
-# Install system dependencies for media processing
-RUN apt-get update && apt-get install -y \
-  ffmpeg \
-  python3 \
-  python3-pip &&
-  pip3 install yt-dlp
-
-# Copy manifests
-COPY Cargo.toml Cargo.lock* ./
-
-# Cache dependencies
-RUN mkdir src &&
-  echo "fn main() {}" >src/main.rs &&
-  cargo build --release &&
-  rm -rf src
-
-# Copy source code
-COPY src ./src
-COPY static ./static
-
-# Build the application
-RUN touch src/main.rs && cargo build --release
-
-# Runtime stage
-FROM debian:bookworm-slim
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-  ffmpeg \
-  python3 \
-  python3-pip \
-  ca-certificates &&
-  pip3 install yt-dlp &&
-  apt-get clean &&
+# Install build dependencies (like openssl, pkg-config for some crates)
+# Update package list and install dependencies
+RUN apt-get update &&
+  apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    ca-certificates &&
+  # Clean up apt cache
   rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Copy the Cargo configuration files
+COPY Cargo.toml Cargo.lock ./
 
-# Copy the built executable from the builder stage
-COPY --from=builder /app/target/release/pegasus /app/pegasus
+# Build dependencies first to leverage Docker cache
+# Create a dummy main.rs to build only dependencies
+RUN mkdir src && echo "fn main() {}" >src/main.rs
+# Build only the dependencies to cache them
+RUN cargo build --release --locked
+# Remove dummy source file
+RUN rm -f src/main.rs
 
-# Copy static files
-COPY --from=builder /app/static /app/static
+# Copy the application source code
+COPY src ./src
+# Copy static frontend files
+COPY static ./static
 
-# Create media directories
-RUN mkdir -p /app/media/downloads /app/media/processed
+# Build the application executable
+# Touch source files to ensure rebuild if needed
+RUN touch src/main.rs
+RUN cargo build --release --locked
 
-# Expose the web server port
-EXPOSE 8080
+# Stage 2: Runtime
+# Use a minimal base image for the final container
+FROM debian:bookworm-slim as runtime
 
-# Set environment variables
-ENV RUST_LOG=info
-ENV MEDIA_PATH=/app/media
+# Set the working directory
+WORKDIR /usr/local/pegasus
 
-# Run the application
-CMD ["/app/pegasus"]
+# Install runtime dependencies: yt-dlp and ffmpeg
+# Update package list and install dependencies
+RUN apt-get update &&
+  apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    ffmpeg \
+    ca-certificates &&
+  # Install yt-dlp using pip
+  pip3 install --no-cache-dir yt-dlp &&
+  # Clean up apt cache
+  rm -rf /var/lib/apt/lists/*
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /usr/src/pegasus/target/release/pegasus .
+
+# Copy the static files from the builder stage
+COPY --from=builder /usr/src/pegasus/static ./static
+
+# Define environment variables (optional, can be overridden)
+# ENV ROCKET_ADDRESS=0.0.0.0
+# ENV ROCKET_PORT=8000
+# ENV MEDIA_SERVER_PATH=/media
+# ENV DOWNLOAD_DIR=/data/downloads
+# ENV PROCESSED_DIR=/data/processed
+
+# Expose the port the application will run on (adjust if needed)
+EXPOSE 8000
+
+# Set the entrypoint for the container
+# The application binary will be executed when the container starts
+ENTRYPOINT ["./pegasus"]

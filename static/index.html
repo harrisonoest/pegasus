@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pegasus</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Pegasus</h1>
+        <p>Swiftly process and deliver your media files</p>
+      </header>
+
+      <main>
+        <form id="uploadForm">
+          <div class="form-group">
+            <label for="mediaUrl">Media URL</label>
+            <input
+              type="url"
+              id="mediaUrl"
+              name="mediaUrl"
+              placeholder="https://example.com/media.mp4"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="outputDir">Output Directory</label>
+            <input
+              type="text"
+              id="outputDir"
+              name="outputDir"
+              placeholder="/home/user/media"
+              required
+            />
+          </div>
+
+          <div class="processing-options">
+            <h2>Processing Options</h2>
+            <div class="options-grid">
+              <div class="option">
+                <input
+                  type="checkbox"
+                  id="compress"
+                  name="options"
+                  value="compress"
+                />
+                <label for="compress">Compress</label>
+              </div>
+              <div class="option">
+                <input
+                  type="checkbox"
+                  id="resize"
+                  name="options"
+                  value="resize"
+                />
+                <label for="resize">Resize</label>
+              </div>
+              <div class="option">
+                <input
+                  type="checkbox"
+                  id="convert"
+                  name="options"
+                  value="convert"
+                />
+                <label for="convert">Audio Only</label>
+              </div>
+              <!-- <div class="option">
+                <input
+                  type="checkbox"
+                  id="optimize"
+                  name="options"
+                  value="optimize"
+                />
+                <label for="optimize">Optimize</label>
+              </div> -->
+              <div class="option">
+                <input
+                  type="checkbox"
+                  id="metadata"
+                  name="options"
+                  value="metadata"
+                />
+                <label for="metadata">Extract Metadata</label>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" id="submitBtn">Submit</button>
+        </form>
+
+        <div id="status" class="status"></div>
+      </main>
+
+      <!-- <footer>
+            <p>Pegasus Media Processing Service</p>
+        </footer> -->
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
