@@ -4,8 +4,8 @@
 pub mod handlers;
 
 use axum::{
-    routing::{get_service, post},
     Router,
+    routing::{get_service, post},
 };
 use tower_http::services::ServeDir;
 

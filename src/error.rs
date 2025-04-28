@@ -16,7 +16,7 @@ pub enum PegasusError {
     WebServerError(String),
 
     #[error("Download error (yt-dlp): {0}")]
-    YtDlpError(#[from] yt_dlp::error::Error),
+    YtDlpError(String),
 
     #[error("Download error (general): {0}")]
     DownloadError(String),
@@ -29,6 +29,12 @@ pub enum PegasusError {
 
     #[error("I/O error: {0}")]
     IoError(#[from] std::io::Error),
+
+    #[error("External service error: {0}")]
+    ExternalServiceError(String),
+
+    #[error("External command error: {0}")]
+    ExternalCommandError(String),
 
     #[error("Unknown error: {0}")]
     Unknown(String),

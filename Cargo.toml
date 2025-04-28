@@ -27,9 +27,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 # Environment variable loading from .env file
 dotenvy = "0.15"
 
-# Media Downloading
-yt-dlp = { version = "1.3.3", features = ["tracing"] }
-
-# --- Placeholder for future dependencies ---
-# reqwest = { version = "0.12", features = ["json"] } # For making HTTP requests (if needed beyond yt-dlp)
+# --- External dependencies ---
+reqwest = { version = "0.12", features = ["json"] } # For making HTTP requests and downloading thumbnails
 # config = "0.14" # For configuration management

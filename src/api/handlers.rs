@@ -2,9 +2,9 @@
 // Contains the handler functions for API endpoints.
 
 use axum::{
+    Json, // Used to extract JSON request bodies
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json, // Used to extract JSON request bodies
 };
 use serde::{Deserialize, Serialize}; // Needed for deriving Deserialize on the payload struct and Serialize for response
 use std::path::PathBuf;

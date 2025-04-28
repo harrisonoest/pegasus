@@ -25,8 +25,8 @@ use tracing::{error, info};
 // Import dotenvy for loading .env files
 use dotenvy::dotenv;
 // Import EnvFilter for tracing configuration
+use std::process::Command;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
-use yt_dlp::Youtube;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -89,15 +89,69 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Installs ffmpeg and yt-dlp binaries.
+/// Checks if ffmpeg and yt-dlp binaries are available and working.
 ///
 /// # Returns
 ///
 /// A `Result` containing `()` on success, or a `PegasusError` on failure.
 async fn install_binaries() -> Result<()> {
-    let executables_dir = PathBuf::from("libs");
+    // Create output directory if it doesn't exist
     let output_dir = PathBuf::from("output");
+    if !output_dir.exists() {
+        info!("Creating output directory");
+        tokio::fs::create_dir_all(&output_dir).await.map_err(|e| {
+            error!(error = %e, "Failed to create output directory");
+            error::PegasusError::IoError(e)
+        })?;
+    }
 
-    Youtube::with_new_binaries(executables_dir, output_dir).await?;
+    // Check if yt-dlp is available
+    info!("Checking if yt-dlp is available");
+    let yt_dlp_version = Command::new("yt-dlp")
+        .arg("--version")
+        .output()
+        .map_err(|e| {
+            error!(error = %e, "Failed to execute yt-dlp");
+            error::PegasusError::ExternalCommandError(format!(
+                "yt-dlp not found or not executable: {}",
+                e
+            ))
+        })?;
+
+    if !yt_dlp_version.status.success() {
+        let stderr = String::from_utf8_lossy(&yt_dlp_version.stderr);
+        error!(stderr = %stderr, "yt-dlp command failed");
+        return Err(error::PegasusError::ExternalCommandError(format!(
+            "yt-dlp command failed: {}",
+            stderr
+        )));
+    }
+
+    let version = String::from_utf8_lossy(&yt_dlp_version.stdout);
+    info!(version = %version.trim(), "yt-dlp version");
+
+    // Check if ffmpeg is available
+    info!("Checking if ffmpeg is available");
+    let ffmpeg_version = Command::new("ffmpeg")
+        .arg("-version")
+        .output()
+        .map_err(|e| {
+            error!(error = %e, "Failed to execute ffmpeg");
+            error::PegasusError::ExternalCommandError(format!(
+                "ffmpeg not found or not executable: {}",
+                e
+            ))
+        })?;
+
+    if !ffmpeg_version.status.success() {
+        let stderr = String::from_utf8_lossy(&ffmpeg_version.stderr);
+        error!(stderr = %stderr, "ffmpeg command failed");
+        return Err(error::PegasusError::ExternalCommandError(format!(
+            "ffmpeg command failed: {}",
+            stderr
+        )));
+    }
+
+    info!("ffmpeg is available");
     Ok(())
 }
