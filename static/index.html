@@ -11,15 +11,20 @@
 <body>
   <div class="container">
     <header>
-      <h1>Pegasus</h1>
+      <div class="title-container">
+        <h1>Pegasus</h1>
+        <img src="pegasus.svg" alt="Pegasus Logo" id="header-logo" class="filter-blue">
+      </div>
       <p>Swiftly process and deliver your media files</p>
     </header>
 
     <main>
       <form id="uploadForm">
         <div class="form-group">
-          <label for="mediaUrl">Media URL</label>
-          <input type="url" id="mediaUrl" name="mediaUrl" placeholder="https://example.com/media.mp4" required />
+          <label for="mediaUrls">Media URLs (one per line)</label>
+          <textarea id="mediaUrls" name="mediaUrls" rows="5" placeholder="https://example.com/media1.mp4
+https://example.com/media2.mp3
+https://example.com/playlist1" required></textarea>
         </div>
 
         <div class="form-group">

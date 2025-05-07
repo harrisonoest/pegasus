@@ -7,6 +7,11 @@
   --border-color: #ddd;
   --success-color: #4caf50;
   --error-color: #f44336;
+
+  --accent-color-rgb: 79, 195, 247;
+  --success-color-rgb: 76, 175, 80;
+  --error-color-rgb: 244, 67, 54;
+  --secondary-color-rgb: 22, 96, 136;
 }
 
 * {
@@ -33,15 +38,51 @@ header {
   margin-bottom: 2rem;
 }
 
-header h1 {
-  color: var(--primary-color);
-  font-size: 2.5rem;
+.title-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 0.5rem;
+  color: var(--primary-color);
+}
+
+#header-logo {
+  height: 50px;
+  margin-left: 15px;
+}
+
+.filter-blue {
+  filter: invert(39%) sepia(83%) saturate(326%) hue-rotate(175deg) brightness(90%) contrast(87%);
+}
+
+.audio-only-section {
+  display: flex;
+  align-items: center;
+}
+
+.audio-only-section input[type="checkbox"] {
+  margin-right: 0.5em;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.checkbox-group input[type="radio"] {
+  margin-right: 0.5em;
+}
+
+header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0;
 }
 
 header p {
   color: var(--secondary-color);
   font-size: 1.2rem;
+  margin-bottom: 2rem;
 }
 
 form {
@@ -49,10 +90,13 @@ form {
   padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
 }
 
 label {
@@ -62,19 +106,24 @@ label {
 }
 
 input[type="url"],
-input[type="text"] {
+input[type="text"],
+textarea {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: 1rem;
+  font-family: inherit;
+  line-height: 1.4;
+  resize: vertical;
 }
 
 input[type="url"]:focus,
-input[type="text"]:focus {
+input[type="text"]:focus,
+textarea:focus {
   outline: none;
   border-color: var(--accent-color);
-  box-shadow: 0 0 0 2px rgba(79, 195, 247, 0.2);
+  box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb), 0.2);
 }
 
 .processing-options {
@@ -88,42 +137,52 @@ input[type="text"]:focus {
   font-size: 1.2rem;
   margin-bottom: 1rem;
   color: var(--secondary-color);
+  text-align: center;
 }
 
 .processing-options h3 {
   font-size: 1.1rem;
-  margin: 1rem 0;
+  margin: 1rem 0 0.75rem 0;
   color: var(--secondary-color);
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 0.5rem;
 }
 
 .media-type-selector {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   padding-bottom: 1rem;
   border-bottom: 2px solid var(--border-color);
 }
 
 .primary-option {
   font-weight: bold;
+  padding: 0.5rem;
+  border-radius: 4px;
+  background-color: rgba(var(--accent-color-rgb), 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .primary-option label {
   font-size: 1.1rem;
+  margin-left: 0.5rem;
 }
 
 .options-section {
   margin-top: 1rem;
-  padding: 1rem;
+  padding: 1.5rem;
   background-color: rgba(245, 247, 250, 0.5);
-  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .options-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
 }
 
 .option {
@@ -133,22 +192,14 @@ input[type="text"]:focus {
 }
 
 .option input[type="checkbox"] {
-  margin-right: 0.5rem;
-  cursor: pointer;
+  margin-right: 0.5em;
 }
 
 .option label {
-  cursor: pointer;
+  margin-right: 0.5em;
 }
 
 .select-option {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.select-option label {
-  margin-bottom: 0.5rem;
   font-weight: 500;
 }
 
@@ -178,6 +229,7 @@ button {
   cursor: pointer;
   transition: background-color 0.3s;
   width: 100%;
+  margin-top: 1rem;
 }
 
 button:hover {
@@ -189,6 +241,38 @@ button:hover {
   padding: 1rem;
   border-radius: 4px;
   display: none;
+}
+
+.status p {
+  padding: 0.3rem 0.5rem;
+  margin-bottom: 0.25rem;
+  border-left: 4px solid transparent;
+  /* Default border */
+}
+
+.status p:last-child {
+  margin-bottom: 0;
+}
+
+.status p.success {
+  color: var(--success-color);
+  border-left-color: var(--success-color);
+  background-color: rgba(var(--success-color-rgb), 0.05);
+  /* Subtle background */
+}
+
+.status p.error {
+  color: var(--error-color);
+  border-left-color: var(--error-color);
+  background-color: rgba(var(--error-color-rgb), 0.05);
+}
+
+.status p.info {
+  color: var(--text-color);
+  /* Or a dedicated info text color */
+  border-left-color: var(--secondary-color);
+  /* Using secondary color for info border */
+  background-color: rgba(var(--secondary-color-rgb), 0.05);
 }
 
 .status.success {
@@ -212,16 +296,162 @@ footer {
   font-size: 0.9rem;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-color: var(--dark-primary-color);
+    --secondary-color: var(--dark-secondary-color);
+    --accent-color: var(--dark-accent-color);
+    --background-color: var(--dark-background-color);
+    --text-color: var(--dark-text-color);
+    --border-color: var(--dark-border-color);
+
+    --dark-primary-color: #5e81ac;
+    --dark-secondary-color: #81a1c1;
+    --dark-accent-color: #88c0d0;
+    --dark-background-color: #2e3440;
+    --dark-text-color: #eceff4;
+    --dark-border-color: #4c566a;
+    --dark-surface-color: #3b4252;
+
+    --accent-color-rgb: 136, 192, 208;
+    /* From --dark-accent-color #88c0d0 */
+    --success-color-rgb: 143, 188, 143;
+    /* From dark theme success text color #8fbc8f */
+    --error-color-rgb: 240, 128, 128;
+    /* From dark theme error text color #f08080 */
+    --secondary-color-rgb: 129, 161, 193;
+    /* From --dark-secondary-color #81a1c1 */
+  }
+
+  form {
+    background-color: var(--dark-surface-color);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  }
+
+  input[type="url"],
+  input[type="text"],
+  textarea {
+    background-color: var(--dark-background-color);
+    color: var(--dark-text-color);
+    border: 1px solid var(--dark-border-color);
+  }
+
+  input[type="url"]:focus,
+  input[type="text"]:focus,
+  textarea:focus {
+    border-color: var(--dark-accent-color);
+    box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb), 0.25);
+  }
+
+  .processing-options {
+    border: 1px solid var(--dark-border-color);
+  }
+
+  .processing-options h2,
+  .processing-options h3 {
+    color: var(--dark-secondary-color);
+    border-bottom-color: var(--dark-border-color);
+  }
+
+  .media-type-selector {
+    border-bottom: 2px solid var(--dark-border-color);
+  }
+
+  .options-section {
+    background-color: rgba(59, 66, 82, 0.8);
+    border: 1px solid var(--dark-border-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  }
+
+  select {
+    background-color: var(--dark-surface-color);
+    color: var(--dark-text-color);
+    border: 1px solid var(--dark-border-color);
+  }
+
+  select:focus {
+    border-color: var(--dark-accent-color);
+    box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb), 0.25);
+  }
+
+  button {
+    background-color: var(--dark-primary-color);
+  }
+
+  button:hover {
+    background-color: var(--dark-secondary-color);
+  }
+
+  .status p.success {
+    color: #8fbc8f;
+    /* Light green text for dark theme */
+    border-left-color: #8fbc8f;
+    background-color: rgba(var(--success-color-rgb), 0.1);
+    /* Uses the dark theme --success-color-rgb */
+  }
+
+  .status p.error {
+    color: #f08080;
+    /* Light red text for dark theme */
+    border-left-color: #f08080;
+    background-color: rgba(var(--error-color-rgb), 0.1);
+    /* Uses the dark theme --error-color-rgb */
+  }
+
+  .status p.info {
+    color: var(--dark-text-color);
+    border-left-color: var(--dark-secondary-color);
+    background-color: rgba(var(--secondary-color-rgb), 0.1);
+    /* Uses the dark theme --secondary-color-rgb */
+  }
+
+  .status.success {
+    background-color: rgba(143, 188, 143, 0.15);
+    color: #8fbc8f;
+    border: 1px solid #8fbc8f;
+  }
+
+  .status.error {
+    background-color: rgba(240, 128, 128, 0.15);
+    color: #f08080;
+    border: 1px solid #f08080;
+  }
+}
+
 @media (max-width: 600px) {
   .container {
     padding: 1rem;
   }
 
+  header h1 {
+    font-size: 2rem;
+  }
+
+  header p {
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
   form {
     padding: 1.5rem;
+    gap: 1rem;
   }
 
   .options-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .processing-options h2 {
+    font-size: 1.1rem;
+  }
+
+  .processing-options h3 {
+    font-size: 1rem;
+  }
+
+  button {
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
   }
 }
