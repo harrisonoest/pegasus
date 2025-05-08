@@ -5,7 +5,9 @@ pub mod handlers;
 
 use axum::{
     Router,
-    routing::{get_service, post},
+    extract::ws::WebSocketUpgrade,
+    response::IntoResponse,
+    routing::{get, get_service, post},
 };
 use tower_http::services::ServeDir;
 
@@ -26,7 +28,15 @@ pub fn create_router() -> Router {
         // Define the API route `/api/submit` which accepts POST requests
         // It's linked to the `submit_url` handler function.
         .route("/api/submit", post(handlers::submit_url))
+        // WebSocket route for real-time download progress updates
+        .route("/ws", get(ws_handler))
         // Define a fallback service to serve static files for any other request.
         // This allows serving index.html, styles.css, script.js, etc.
         .fallback_service(static_service)
+}
+
+/// WebSocket handler for real-time updates
+async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
+    // Accept the WebSocket connection and pass it to the handler
+    ws.on_upgrade(handlers::handle_socket_connection)
 }

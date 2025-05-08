@@ -6,6 +6,188 @@ document.addEventListener("DOMContentLoaded", function () {
   const videoOptionsSection = document.getElementById("video-options");
   const audioOptionsSection = document.getElementById("audio-options");
 
+  // Create separate containers for different types of status messages
+  const formStatusDiv = document.createElement('div');
+  formStatusDiv.id = 'form-status';
+  statusDiv.appendChild(formStatusDiv);
+
+  const progressStatusDiv = document.createElement('div');
+  progressStatusDiv.id = 'progress-status';
+  progressStatusDiv.style.marginBottom = '20px'; // Add margin below progress updates
+  statusDiv.appendChild(progressStatusDiv);
+
+  // Map to store active downloads and their progress elements
+  const activeDownloads = new Map();
+
+  // WebSocket connection for real-time progress updates
+  let socket = null;
+
+  // Connect to WebSocket server
+  function connectWebSocket() {
+    // Get the current host and protocol
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/ws`;
+
+    // Create WebSocket connection
+    socket = new WebSocket(wsUrl);
+
+    // Connection opened
+    socket.addEventListener('open', (event) => {
+      console.log('Connected to Pegasus WebSocket server');
+    });
+
+    // Listen for messages
+    socket.addEventListener('message', (event) => {
+      try {
+        // Check if this is the welcome message
+        if (event.data.startsWith('Connected to')) {
+          console.log(event.data);
+          return;
+        }
+
+        // Parse the progress update
+        const update = JSON.parse(event.data);
+        handleProgressUpdate(update);
+      } catch (error) {
+        console.error('Error handling WebSocket message:', error);
+      }
+    });
+
+    // Connection closed
+    socket.addEventListener('close', (event) => {
+      console.log('Disconnected from Pegasus WebSocket server');
+      // Try to reconnect after a delay
+      setTimeout(connectWebSocket, 3000);
+    });
+
+    // Connection error
+    socket.addEventListener('error', (event) => {
+      console.error('WebSocket error:', event);
+    });
+  }
+
+  // Handle progress updates from WebSocket
+  function handleProgressUpdate(update) {
+    // Get or create progress element for this job
+    let progressElement = activeDownloads.get(update.job_id);
+
+    if (!progressElement) {
+      // Create new progress element if this is a new job
+      progressElement = createProgressElement(update);
+      activeDownloads.set(update.job_id, progressElement);
+      progressStatusDiv.appendChild(progressElement.container);
+    }
+
+    // Update the progress element
+    updateProgressElement(progressElement, update);
+
+    // If download is complete or failed, remove from active downloads after a delay
+    if (update.status === 'completed' || update.status === 'error') {
+      setTimeout(() => {
+        activeDownloads.delete(update.job_id);
+      }, 60000); // Keep completed downloads visible for 1 minute
+    }
+  }
+
+  // Create a new progress element for a download
+  function createProgressElement(update) {
+    const container = document.createElement('div');
+    container.className = 'download-progress';
+    container.dataset.jobId = update.job_id;
+
+    const header = document.createElement('div');
+    header.className = 'download-header';
+
+    const title = document.createElement('h3');
+    // Get a cleaner filename or use the URL domain
+    const displayName = getDisplayNameFromUrl(update.url);
+    title.textContent = `${displayName}`;
+    header.appendChild(title);
+
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'progress-container';
+
+    const progressBar = document.createElement('div');
+    progressBar.className = 'progress-bar infinite'; // Add infinite class by default
+    progressContainer.appendChild(progressBar);
+
+    const progressText = document.createElement('div');
+    progressText.className = 'progress-text';
+    progressText.textContent = 'Processing...'; // Default text
+
+    const statusText = document.createElement('div');
+    statusText.className = 'status-text';
+    statusText.textContent = update.message || 'Starting download...';
+
+    container.appendChild(header);
+    container.appendChild(progressContainer);
+    container.appendChild(progressText);
+    container.appendChild(statusText);
+
+    return {
+      container,
+      progressBar,
+      progressText,
+      statusText
+    };
+  }
+
+  // Update an existing progress element with new data
+  function updateProgressElement(element, update) {
+    // Force the update to be applied immediately
+    window.requestAnimationFrame(() => {
+      // Only change infinite animation to completed/error when done
+      if (update.status === 'completed') {
+        element.progressBar.classList.remove('infinite');
+        element.progressBar.style.width = '100%';
+        element.progressText.textContent = 'Complete';
+        // Add a subtle animation for completion
+        element.container.style.transform = 'translateY(-2px)';
+      } else if (update.status === 'error') {
+        element.progressBar.classList.remove('infinite');
+        element.progressBar.style.width = '100%';
+        element.progressText.textContent = 'Failed';
+      } else {
+        // For all other statuses, show infinite animation
+        element.progressBar.classList.add('infinite');
+        element.progressText.textContent = 'Processing...';
+      }
+
+      // Update status text
+      element.statusText.textContent = update.message;
+
+      // Update classes based on status
+      element.container.className = 'download-progress';
+      element.container.classList.add(update.status);
+    });
+  }
+
+  // This function was removed as it's not used anywhere in the codebase
+  // and getDisplayNameFromUrl is used instead
+
+  // Helper function to get a display name from URL
+  function getDisplayNameFromUrl(url) {
+    try {
+      const urlObj = new URL(url);
+
+      // Check for YouTube or other video platforms
+      if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+        return 'YouTube Video';
+      } else if (urlObj.hostname.includes('vimeo.com')) {
+        return 'Vimeo Video';
+      } else if (urlObj.hostname.includes('soundcloud.com')) {
+        return 'SoundCloud Audio';
+      }
+
+      // For other URLs, use the domain name
+      return urlObj.hostname.replace('www.', '');
+    } catch (e) {
+      // If URL parsing fails, just return a generic name
+      return 'Media Download';
+    }
+  }
+
   // Initialize the UI based on the default state
   updateOptionsVisibility();
 
@@ -22,6 +204,9 @@ document.addEventListener("DOMContentLoaded", function () {
       audioOptionsSection.style.display = "none";
     }
   }
+
+  // Initialize WebSocket connection
+  connectWebSocket();
 
   form.addEventListener("submit", async function (e) {
     e.preventDefault();
@@ -67,7 +252,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Show loading state
     submitBtn.disabled = true;
     submitBtn.textContent = "Processing...";
-    statusDiv.innerHTML = ''; // Clear previous statuses
+    formStatusDiv.innerHTML = ''; // Clear previous form statuses ONLY
     showStatus(`Starting processing for ${urls.length} URL(s)...`, "info");
     if (!document.getElementById("outputDir").value && outputDir === "/tmp/pegasus_downloads") {
       appendStatus(`No output directory specified. Using default: ${outputDir}`, "info");
@@ -100,7 +285,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (response.ok) {
           const result = await response.json();
-          appendStatus(`(${i + 1}/${urls.length}) Success for ${currentUrl} - Job ID: ${result.jobId}`, "success");
+          appendStatus(`(${i + 1}/${urls.length}) Success for ${currentUrl} - Job ID: ${result.job_id}`, "success");
           successfulCount++;
         } else {
           allSuccessful = false;
@@ -128,12 +313,12 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   function showStatus(message, type) {
-    // If this is the first message (clearing old ones) or an overall summary
-    statusDiv.innerHTML = ''; // Clear previous content for a new summary message
+    // Only clear the form status section, not the entire statusDiv
+    formStatusDiv.innerHTML = '';
     const p = document.createElement('p');
     p.textContent = message;
     p.className = type || '';
-    statusDiv.appendChild(p);
+    formStatusDiv.appendChild(p);
 
     statusDiv.className = "status"; // Base class
     if (type) {
@@ -152,7 +337,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (type) {
       p.classList.add(type); // e.g., 'success', 'error', 'info'
     }
-    statusDiv.appendChild(p);
+    formStatusDiv.appendChild(p);
     statusDiv.style.display = "block"; // Ensure div is visible
   }
 });

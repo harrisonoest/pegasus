@@ -13,7 +13,6 @@ use std::path::PathBuf;
 
 // Use common types
 use config::Config;
-// Removed unused PegasusError import, keeping Result
 use error::Result;
 
 // Import Axum and Tokio listener

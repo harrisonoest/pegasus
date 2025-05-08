@@ -11,7 +11,7 @@ tokio = { version = "1", features = ["full"] }
 thiserror = "1.0"
 
 # Web framework
-axum = "0.7"
+axum = { version = "0.7", features = ["ws"] }
 
 # Serving static files and CORS handling (optional but common)
 tower-http = { version = "0.5.0", features = ["fs", "cors"] }
@@ -28,5 +28,19 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 dotenvy = "0.15"
 
 # --- External dependencies ---
-reqwest = { version = "0.12", features = ["json"] } # For making HTTP requests and downloading thumbnails
+reqwest = { version = "0.12", features = [
+  "json",
+] } # For making HTTP requests and downloading thumbnails
 # config = "0.14" # For configuration management
+
+# Added for WebSocket and async operations
+futures = "0.3"
+
+# Added for generating unique IDs
+uuid = { version = "1.3", features = ["v4"] }
+
+# Added for regex parsing of yt-dlp output
+regex = "1.5"
+
+# Added for static lazy initialization
+once_cell = "1.19"

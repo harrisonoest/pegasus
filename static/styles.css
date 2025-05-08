@@ -21,7 +21,7 @@
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background-color: var(--background-color);
   color: var(--text-color);
   line-height: 1.6;
@@ -52,7 +52,8 @@ header {
 }
 
 .filter-blue {
-  filter: invert(39%) sepia(83%) saturate(326%) hue-rotate(175deg) brightness(90%) contrast(87%);
+  filter: invert(39%) sepia(83%) saturate(326%) hue-rotate(175deg)
+    brightness(90%) contrast(87%);
 }
 
 .audio-only-section {
@@ -272,6 +273,122 @@ button:hover {
   /* Or a dedicated info text color */
   border-left-color: var(--secondary-color);
   /* Using secondary color for info border */
+}
+
+/* Download progress styles */
+.download-progress {
+  margin: 15px 0;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid var(--primary-color);
+  transition: all 0.3s ease;
+}
+
+.download-progress.completed {
+  border-left-color: var(--success-color);
+}
+
+.download-progress.error {
+  border-left-color: var(--error-color);
+}
+
+.download-progress.warning {
+  border-left-color: #ff9800; /* Warning color */
+}
+
+.download-progress.info {
+  border-left-color: var(--secondary-color);
+}
+
+.download-progress.downloading {
+  border-left-color: var(--primary-color);
+}
+
+.download-progress.processing {
+  border-left-color: var(--accent-color);
+}
+
+.download-header {
+  margin-bottom: 10px;
+}
+
+.download-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.progress-container {
+  height: 12px;
+  background-color: var(--background-color);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 12px 0;
+  position: relative;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: var(--primary-color);
+  width: 0;
+  transition: width 0.3s ease;
+}
+
+/* Infinite progress animation */
+.progress-bar.infinite {
+  width: 35%;
+  background-color: var(--accent-color);
+  background-image: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+  background-size: 200% 100%;
+  animation: progressAnimation 1.5s linear infinite;
+  box-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.5);
+}
+
+@keyframes progressAnimation {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.download-progress.completed .progress-bar {
+  background-color: var(--success-color);
+}
+
+.download-progress.error .progress-bar {
+  background-color: var(--error-color);
+}
+
+.download-progress.processing .progress-bar {
+  background-color: var(--accent-color);
+}
+
+.progress-text {
+  font-weight: 600;
+  margin: 8px 0;
+  color: var(--secondary-color);
+  font-size: 0.9rem;
+}
+
+.status-text {
+  font-size: 0.9rem;
+  color: var(--text-color);
+  margin-top: 5px;
+  opacity: 0.8;
+}
+
+.status p.info {
   background-color: rgba(var(--secondary-color-rgb), 0.05);
 }
 

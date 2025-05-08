@@ -1,112 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pegasus</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pegasus</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="title-container">
+          <h1>Pegasus</h1>
+          <img
+            src="pegasus.svg"
+            alt="Pegasus Logo"
+            id="header-logo"
+            class="filter-blue"
+          />
+        </div>
+        <p>Swiftly process and deliver your media files</p>
+      </header>
 
-<body>
-  <div class="container">
-    <header>
-      <div class="title-container">
-        <h1>Pegasus</h1>
-        <img src="pegasus.svg" alt="Pegasus Logo" id="header-logo" class="filter-blue">
-      </div>
-      <p>Swiftly process and deliver your media files</p>
-    </header>
-
-    <main>
-      <form id="uploadForm">
-        <div class="form-group">
-          <label for="mediaUrls">Media URLs (one per line)</label>
-          <textarea id="mediaUrls" name="mediaUrls" rows="5" placeholder="https://example.com/media1.mp4
+      <main>
+        <form id="uploadForm">
+          <div class="form-group">
+            <label for="mediaUrls">Media URLs (one per line)</label>
+            <textarea
+              id="mediaUrls"
+              name="mediaUrls"
+              rows="5"
+              placeholder="https://example.com/media1.mp4
 https://example.com/media2.mp3
-https://example.com/playlist1" required></textarea>
-        </div>
+https://example.com/playlist1"
+              required
+            ></textarea>
+          </div>
 
-        <div class="form-group">
-          <label for="outputDir">Output Directory</label>
-          <input type="text" id="outputDir" name="outputDir" placeholder="/home/user/media" />
-        </div>
+          <div class="form-group">
+            <label for="outputDir">Output Directory</label>
+            <input
+              type="text"
+              id="outputDir"
+              name="outputDir"
+              placeholder="/home/user/media"
+            />
+          </div>
 
-        <div class="processing-options">
-          <h2>Processing Options</h2>
+          <div class="processing-options">
+            <h2>Processing Options</h2>
 
-          <div class="media-type-selector">
-            <div class="option primary-option">
-              <input type="checkbox" id="audio-only" name="options" value="audio-only" />
-              <label for="audio-only">Audio Only</label>
+            <div class="media-type-selector">
+              <div class="option primary-option">
+                <input
+                  type="checkbox"
+                  id="audio-only"
+                  name="options"
+                  value="audio-only"
+                />
+                <label for="audio-only">Audio Only</label>
+              </div>
+            </div>
+
+            <div class="options-section" id="video-options">
+              <h3>Video Options</h3>
+              <div class="options-grid">
+                <div class="option select-option">
+                  <label for="video-quality">Quality:</label>
+                  <select id="video-quality" name="video-quality">
+                    <option value="video-quality-high">High</option>
+                    <option value="video-quality-medium">Medium</option>
+                    <option value="video-quality-low">Low</option>
+                  </select>
+                </div>
+                <div class="option">
+                  <input
+                    type="checkbox"
+                    id="video-embed-subs"
+                    name="options"
+                    value="video-embed-subs"
+                  />
+                  <label for="video-embed-subs">Embed Subtitles</label>
+                </div>
+                <div class="option">
+                  <input
+                    type="checkbox"
+                    id="video-add-thumbnail"
+                    name="options"
+                    value="add-thumbnail"
+                  />
+                  <label for="video-add-thumbnail">Add Thumbnail</label>
+                </div>
+                <div class="option">
+                  <input
+                    type="checkbox"
+                    id="video-embed-metadata"
+                    name="options"
+                    value="metadata"
+                  />
+                  <label for="video-embed-metadata">Embed Metadata</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="options-section" id="audio-options">
+              <h3>Audio Options</h3>
+              <div class="options-grid">
+                <div class="option select-option">
+                  <label for="audio-format">Format:</label>
+                  <select id="audio-format" name="audio-format">
+                    <option value="audio-format-mp3">MP3</option>
+                    <option value="audio-format-m4a">M4A</option>
+                    <option value="audio-format-opus">Opus</option>
+                  </select>
+                </div>
+                <div class="option select-option">
+                  <label for="audio-quality">Quality:</label>
+                  <select id="audio-quality" name="audio-quality">
+                    <option value="audio-quality-high">High</option>
+                    <option value="audio-quality-medium">Medium</option>
+                    <option value="audio-quality-low">Low</option>
+                  </select>
+                </div>
+                <div class="option">
+                  <input
+                    type="checkbox"
+                    id="audio-add-thumbnail"
+                    name="options"
+                    value="add-thumbnail"
+                  />
+                  <label for="audio-add-thumbnail">Add Thumbnail</label>
+                </div>
+                <div class="option">
+                  <input
+                    type="checkbox"
+                    id="audio-embed-metadata"
+                    name="options"
+                    value="metadata"
+                    checked
+                  />
+                  <label for="audio-embed-metadata">Embed Metadata</label>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="options-section" id="video-options">
-            <h3>Video Options</h3>
-            <div class="options-grid">
-              <div class="option select-option">
-                <label for="video-quality">Quality:</label>
-                <select id="video-quality" name="video-quality">
-                  <option value="video-quality-high">High</option>
-                  <option value="video-quality-medium">Medium</option>
-                  <option value="video-quality-low">Low</option>
-                </select>
-              </div>
-              <div class="option">
-                <input type="checkbox" id="video-embed-subs" name="options" value="video-embed-subs" />
-                <label for="video-embed-subs">Embed Subtitles</label>
-              </div>
-              <div class="option">
-                <input type="checkbox" id="video-add-thumbnail" name="options" value="add-thumbnail" />
-                <label for="video-add-thumbnail">Add Thumbnail</label>
-              </div>
-              <div class="option">
-                <input type="checkbox" id="video-embed-metadata" name="options" value="metadata" />
-                <label for="video-embed-metadata">Embed Metadata</label>
-              </div>
-            </div>
-          </div>
+          <!-- Progress status will be displayed here -->
+          <div id="status" class="status"></div>
 
-          <div class="options-section" id="audio-options">
-            <h3>Audio Options</h3>
-            <div class="options-grid">
-              <div class="option select-option">
-                <label for="audio-format">Format:</label>
-                <select id="audio-format" name="audio-format">
-                  <option value="audio-format-mp3">MP3</option>
-                  <option value="audio-format-m4a">M4A</option>
-                  <option value="audio-format-opus">Opus</option>
-                </select>
-              </div>
-              <div class="option select-option">
-                <label for="audio-quality">Quality:</label>
-                <select id="audio-quality" name="audio-quality">
-                  <option value="audio-quality-high">High</option>
-                  <option value="audio-quality-medium">Medium</option>
-                  <option value="audio-quality-low">Low</option>
-                </select>
-              </div>
-              <div class="option">
-                <input type="checkbox" id="audio-add-thumbnail" name="options" value="add-thumbnail" />
-                <label for="audio-add-thumbnail">Add Thumbnail</label>
-              </div>
-              <div class="option">
-                <input type="checkbox" id="audio-embed-metadata" name="options" value="metadata" checked />
-                <label for="audio-embed-metadata">Embed Metadata</label>
-              </div>
-            </div>
-          </div>
-        </div>
+          <button type="submit" id="submitBtn">Submit</button>
+        </form>
+      </main>
+    </div>
 
-        <button type="submit" id="submitBtn">Submit</button>
-      </form>
-
-      <div id="status" class="status"></div>
-    </main>
-  </div>
-
-  <script src="script.js"></script>
-</body>
-
+    <script src="script.js"></script>
+  </body>
 </html>

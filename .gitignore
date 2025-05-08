@@ -26,6 +26,8 @@ Session.vim
 *.iml
 .vscode/
 .vscode
+.windsurf/
+.windsurfrules
 .project
 .vim/
 .helix/
