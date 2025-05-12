@@ -308,6 +308,17 @@ pub async fn download_video_with_progress(
     };
 
     info!(job_id = %job_id, file_path = %output_path.display(), "Download successful");
+    // Send final progress update to indicate completion
+    send_progress_update(
+        job_id,
+        url,
+        "completed",
+        1.0,
+        &format!(
+            "Download and conversion complete: {}",
+            output_path.display()
+        ),
+    );
     Ok(output_path.display().to_string())
 }
 
