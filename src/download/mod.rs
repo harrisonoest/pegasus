@@ -147,7 +147,8 @@ pub async fn download_video_with_progress(
 
         // Build yt-dlp command for audio extraction with progress
         let mut cmd = Command::new("yt-dlp");
-        cmd.arg("--extract-audio")
+        cmd.arg("-o \"%(title)s.%(ext)s\"")
+            .arg("--extract-audio")
             .arg("--audio-format")
             .arg("mp3")
             .arg("--audio-quality")
