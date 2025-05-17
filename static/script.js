@@ -185,10 +185,125 @@ document.addEventListener("DOMContentLoaded", () => {
    * UI Manager - handles all UI updates and interactions
    */
   const uiManager = {
+    // Function to show the progress indicator
+    showProgressIndicator() {
+      const statusDiv = document.getElementById('status');
+      if (statusDiv) {
+        statusDiv.style.display = 'block';
+        this.toggleProgressIndicator(true);
+      }
+    },
+
+    // Function to hide the progress indicator
+    hideProgressIndicator() {
+      const statusDiv = document.getElementById('status');
+      if (statusDiv) {
+        this.toggleProgressIndicator(false);
+        // Don't hide the status div as it contains messages we want to keep visible
+      }
+    },
     // Initialize the UI based on the default state
     init() {
       this.updateOptionsVisibility();
       this.setupEventListeners();
+      this.setupNavigation();
+      this.setupUrlInput();
+      this.showSection('download'); // Show download section by default
+    },
+
+    // Setup URL input with validation and clear functionality
+    setupUrlInput() {
+      const urlInput = elements.mediaUrlsInput;
+      const formGroup = urlInput.closest('.form-group');
+
+      // Create clear button
+      const clearButton = document.createElement('button');
+      clearButton.type = 'button';
+      clearButton.className = 'btn-clear';
+      clearButton.innerHTML = '&times;';
+      clearButton.title = 'Clear all URLs';
+      clearButton.style.display = 'none';
+
+      // Insert clear button after the textarea
+      formGroup.style.position = 'relative';
+      urlInput.parentNode.insertBefore(clearButton, urlInput.nextSibling);
+
+      // Toggle clear button based on input
+      urlInput.addEventListener('input', () => {
+        clearButton.style.display = urlInput.value.trim() ? 'block' : 'none';
+        this.validateUrls();
+      });
+
+      // Clear button click handler
+      clearButton.addEventListener('click', () => {
+        urlInput.value = '';
+        clearButton.style.display = 'none';
+        this.validateUrls();
+      });
+
+      // Handle paste event for multiple URLs
+      urlInput.addEventListener('paste', (e) => {
+        // Let the paste happen first
+        setTimeout(() => {
+          this.validateUrls();
+        }, 0);
+      });
+    },
+
+    // Validate URLs in the textarea
+    validateUrls() {
+      const urls = utils.parseUrls(elements.mediaUrlsInput.value);
+      const hasInvalidUrls = urls.some(url => !this.isValidUrl(url));
+
+      elements.mediaUrlsInput.classList.toggle('invalid', hasInvalidUrls);
+
+      // Update submit button state
+      elements.submitBtn.disabled = hasInvalidUrls || urls.length === 0;
+      elements.submitBtn.title = hasInvalidUrls
+        ? 'Please fix invalid URLs'
+        : urls.length === 0 ? 'Enter at least one URL' : '';
+
+      return !hasInvalidUrls && urls.length > 0;
+    },
+
+    // Check if a URL is valid
+    isValidUrl(string) {
+      try {
+        const url = new URL(string);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+      } catch (_) {
+        return false;
+      }
+    },
+
+    // Setup navigation between sections
+    setupNavigation() {
+      const navLinks = document.querySelectorAll('.nav-link');
+      navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const section = link.getAttribute('data-section');
+          this.showSection(section);
+
+          // Update active state
+          navLinks.forEach(l => l.classList.remove('active'));
+          link.classList.add('active');
+        });
+      });
+    },
+
+    // Show a specific section and hide others
+    showSection(sectionId) {
+      // Hide all sections first
+      document.querySelectorAll('.content-section').forEach(section => {
+        section.style.display = 'none';
+      });
+
+      // Show the requested section
+      const section = document.getElementById(`${sectionId}-section`);
+      if (section) {
+        section.style.display = 'block';
+      }
     },
 
     // Setup event listeners
@@ -207,103 +322,234 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     },
 
-    // Show status message
-    showStatus(message, type) {
-      // Just update the progress indicator based on the type
-      elements.statusDiv.className = "status"; // Base class
-      if (type) {
-        elements.statusDiv.classList.add(type);
-      }
-      elements.statusDiv.style.display = "block";
+    // Show status message with optional auto-clear
+    showStatus(message, type = 'info', autoClear = 0) {
+      const statusDiv = document.getElementById('progress-info');
+      if (!statusDiv) return null;
 
-      // Show the progress indicator with appropriate status
-      if (type === 'error') {
-        this.updateProgressIndicator(35, 'error');
-      } else if (type === 'success') {
-        this.updateProgressIndicator(100, 'success');
-      } else {
-        this.showProgressIndicator();
+      // Clear existing status if it's an info message (to avoid stacking multiple info messages)
+      if (type === 'info') {
+        const existingInfo = statusDiv.querySelector('.status-message.info');
+        if (existingInfo) {
+          existingInfo.remove();
+        }
+      }
+
+      // Create status element
+      const statusEl = document.createElement('div');
+      statusEl.className = `status-message ${type}`;
+      statusEl.innerHTML = `
+        <span class="status-indicator ${type}"></span>
+        <span class="message">${message}</span>
+      `;
+
+      // Add to container
+      statusDiv.appendChild(statusEl);
+
+      // Auto-scroll to bottom
+      statusDiv.scrollTop = statusDiv.scrollHeight;
+
+      // Auto-clear if specified
+      if (autoClear > 0) {
+        setTimeout(() => {
+          if (statusEl.parentNode === statusDiv) {
+            statusEl.remove();
+          }
+        }, autoClear);
+      }
+
+      return statusEl;
+    },
+
+    // Append a new status message without clearing existing ones
+    appendStatus(message, type = 'info') {
+      return this.showStatus(message, type);
+    },
+
+    // Clear all status messages
+    clearStatus() {
+      const statusDiv = document.getElementById('progress-info');
+      if (statusDiv) {
+        statusDiv.innerHTML = '';
       }
     },
 
-    // Helper function that now just updates the progress indicator
-    appendStatus(message, type) {
-      // Just ensure the status div is visible
-      elements.statusDiv.style.display = "block";
+    // Show or hide the progress indicator
+    toggleProgressIndicator(show = true) {
+      const container = document.querySelector('.global-progress-container');
+      if (!container) return;
 
-      // Update the progress indicator based on the type
-      if (type === 'error') {
-        // Don't change the progress percentage, just the color and animation
-        const currentWidth = elements.progressIndicator.style.width;
-        const percent = parseInt(currentWidth) || 35;
-        this.updateProgressIndicator(percent, 'error');
-      } else if (type === 'success') {
-        // Don't update to 100% for individual successes, just keep the current progress
+      if (show) {
+        container.style.display = 'block';
+        container.classList.add('active');
+      } else {
+        container.classList.remove('active');
+        // Add a small delay before hiding to allow final animation to complete
+        setTimeout(() => {
+          container.style.display = 'none';
+        }, 500);
       }
     },
 
     // Function to show the progress indicator
     showProgressIndicator() {
-      if (elements.progressIndicator) {
-        elements.progressIndicator.style.display = 'block';
-        elements.progressIndicator.style.width = '35%'; // Default animation width
-      }
-    },
-
-    // Function to update the progress indicator with a specific percentage and status
-    updateProgressIndicator(percent, status) {
-      if (elements.progressIndicator) {
-        // If percent is 100, we're done, so remove the animation
-        if (percent >= 100) {
-          elements.progressIndicator.style.width = '100%';
-          elements.progressIndicator.style.animation = 'none';
-          elements.progressIndicator.style.backgroundColor = 'var(--success-color)';
-          // Add a subtle transition effect
-          elements.progressIndicator.style.transition = 'width 0.5s ease-out, background-color 0.5s';
-        } else if (percent <= 0) {
-          // If starting or error, show the animated version
-          elements.progressIndicator.style.width = '35%';
-          elements.progressIndicator.style.animation = 'progressAnimation 1.5s linear infinite';
-          elements.progressIndicator.style.backgroundColor = 'var(--accent-color)';
-        } else {
-          // Otherwise show the actual percentage with a smooth transition
-          elements.progressIndicator.style.width = `${percent}%`;
-          elements.progressIndicator.style.transition = 'width 0.3s ease-out';
-
-          // Set color based on status
-          if (status === 'error') {
-            elements.progressIndicator.style.backgroundColor = 'var(--error-color)';
-            elements.progressIndicator.style.animation = 'none';
-          } else if (status === 'processing') {
-            elements.progressIndicator.style.backgroundColor = 'var(--accent-color)';
-            // Keep the animation for processing state
-            elements.progressIndicator.style.animation = 'progressAnimation 1.5s linear infinite';
-          } else {
-            elements.progressIndicator.style.animation = 'none';
-          }
-        }
-      }
+      this.toggleProgressIndicator(true);
     },
 
     // Function to hide the progress indicator
     hideProgressIndicator() {
-      if (elements.progressIndicator) {
-        elements.progressIndicator.style.display = 'none';
+      this.toggleProgressIndicator(false);
+    },
+
+    // Function to update the progress indicator with a specific percentage and status
+    updateProgressIndicator(percent, status = '') {
+      const container = document.querySelector('.global-progress-container');
+      const indicator = document.querySelector('.progress-indicator');
+      if (!indicator || !container) return;
+
+      // Update width with smooth transition
+      const boundedPercent = Math.min(100, Math.max(0, percent));
+      indicator.style.transform = `scaleX(${boundedPercent / 100})`;
+
+      // Update status classes
+      indicator.className = 'progress-indicator';
+      if (status) {
+        indicator.classList.add(status);
+        container.className = 'global-progress-container';
+        container.classList.add(`status-${status}`);
+      }
+
+      // Add active class when in progress
+      if (boundedPercent > 0 && boundedPercent < 100) {
+        indicator.classList.add('active');
+        container.classList.add('active');
+      } else {
+        indicator.classList.remove('active');
+        container.classList.remove('active');
+      }
+
+      // Directory browser functionality
+      const browseDirBtn = document.getElementById('browse-dir');
+      const downloadDirInput = document.getElementById('default-download-dir');
+
+      if (browseDirBtn && downloadDirInput) {
+        browseDirBtn.addEventListener('click', async () => {
+          try {
+            // This would be replaced with actual Electron dialog in a desktop app
+            // For web, we'll use a fallback input dialog
+            const dir = await showDirectoryPicker({
+              id: 'downloads',
+              mode: 'readwrite',
+              startIn: 'downloads'
+            }).catch(err => {
+              console.log('Directory picker was cancelled');
+              return null;
+            });
+
+            if (dir) {
+              downloadDirInput.value = dir.name || 'Selected Directory';
+            }
+          } catch (error) {
+            console.error('Error selecting directory:', error);
+            // Fallback for browsers that don't support the File System Access API
+            const dir = prompt('Enter download directory path:');
+            if (dir) {
+              downloadDirInput.value = dir;
+            }
+          }
+        });
+      }
+
+      // Theme management
+      function applyTheme(theme) {
+        const root = document.documentElement;
+        // Remove all theme classes first
+        root.removeAttribute('data-theme');
+
+        if (theme !== 'system') {
+          root.setAttribute('data-theme', theme);
+        }
+
+        // Apply the theme to the document
+        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.body.classList.add('dark-theme');
+        } else {
+          document.body.classList.remove('dark-theme');
+        }
+
+        localStorage.setItem('theme', theme);
+      }
+
+      // Initialize theme
+      const savedTheme = localStorage.getItem('theme') || 'system';
+      applyTheme(savedTheme);
+
+      // Set the dropdown to match the saved theme
+      const themeSelect = document.getElementById('theme-preference');
+      if (themeSelect) {
+        themeSelect.value = savedTheme;
+
+        themeSelect.addEventListener('change', (e) => {
+          applyTheme(e.target.value);
+        });
+      }
+
+      // Handle system theme changes
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+        if (localStorage.getItem('theme') === 'system') {
+          applyTheme('system');
+        }
+      });
+
+      // Add completed class when at 100%
+      if (boundedPercent >= 100) {
+        indicator.classList.add('completed');
+        setTimeout(() => {
+          this.hideProgressIndicator();
+        }, 1000);
       }
     },
 
     // Update progress info text
     updateProgressInfo(text) {
-      if (elements.progressInfoDiv) {
-        elements.progressInfoDiv.textContent = text;
+      const progressInfo = document.querySelector('.progress-info');
+      if (progressInfo) {
+        progressInfo.textContent = text;
       }
     },
 
     // Set form to loading state
     setFormLoading(isLoading) {
-      elements.submitBtn.disabled = isLoading;
-      elements.submitBtn.textContent = isLoading ? "Processing..." : "Submit";
-      state.isProcessing = isLoading;
+      const submitBtn = document.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = isLoading;
+        submitBtn.textContent = isLoading ? 'Processing...' : 'Download';
+        submitBtn.classList.toggle('loading', isLoading);
+      }
+    },
+
+    // Handle processing state
+    setProcessingState(isProcessing) {
+      const indicator = document.querySelector('.progress-indicator');
+      if (!indicator) return;
+
+      if (isProcessing) {
+        indicator.classList.add('processing');
+        indicator.classList.add('active');
+      } else {
+        indicator.classList.remove('processing');
+        indicator.classList.remove('active');
+      }
+    },
+
+    // Handle error state
+    setErrorState() {
+      this.updateProgressIndicator(0, 'error');
+    },
+
+    // Handle success state
+    setSuccessState() {
+      this.updateProgressIndicator(100, 'success');
     }
   };
 
@@ -377,51 +623,89 @@ document.addEventListener("DOMContentLoaded", () => {
     async processForm(e) {
       e.preventDefault();
 
-      // Get form data
-      const { urls, outputDir, selectedOptions } = utils.collectFormData();
-
-      // Validate form
-      if (urls.length === 0) {
-        uiManager.showStatus("Please enter at least one valid media URL in the list.", "error");
+      // Validate form before submission
+      if (!uiManager.validateUrls()) {
+        uiManager.showStatus("Please fix the invalid URLs before submitting", "error");
         return;
       }
 
-      // Show loading state
+      // Get form data
+      const { urls, outputDir, selectedOptions } = utils.collectFormData();
+
+      // Update UI for submission
       uiManager.setFormLoading(true);
-
-      // Show and initialize progress indicator
+      uiManager.showStatus(`Starting download of ${urls.length} item(s)...`, "info");
       uiManager.showProgressIndicator();
-      uiManager.updateProgressIndicator(0); // Start with 0%
 
-      if (!elements.outputDirInput.value && outputDir === "/tmp/pegasus_downloads") {
-        uiManager.appendStatus(`No output directory specified. Using default: ${outputDir}`, "info");
-      }
+      // Clear previous results
+      uiManager.clearStatus();
 
       // Initialize job tracking
       const tracker = jobTracker.init(urls.length);
-      uiManager.updateProgressInfo('Submitting jobs to backend...');
 
-      // Process each URL
-      for (let i = 0; i < urls.length; i++) {
-        const currentUrl = urls[i];
-        uiManager.appendStatus(`(${i + 1}/${urls.length}) Processing: ${currentUrl}`, "info");
+      // Track successful and failed downloads
+      let successCount = 0;
+      let errorCount = 0;
 
-        try {
-          // Submit URL to API
-          const result = await apiService.submitUrl(currentUrl, outputDir, selectedOptions);
-          uiManager.appendStatus(`(${i + 1}/${urls.length}) Success for ${currentUrl} - Job ID: ${result.job_id}`, "success");
-          tracker.jobIdToUrl[result.job_id] = currentUrl;
-        } catch (error) {
-          tracker.failedJobs++;
-          uiManager.appendStatus(`(${i + 1}/${urls.length}) Error for ${currentUrl}: ${error.message}`, "error");
+      try {
+        // Process each URL
+        for (let i = 0; i < urls.length; i++) {
+          const url = urls[i];
+          const displayName = utils.getDisplayNameFromUrl(url);
+
+          // Show progress for current item
+          uiManager.updateProgressInfo(`Processing ${i + 1} of ${urls.length}: ${displayName}`);
+          uiManager.updateProgressIndicator((i / urls.length) * 100, 'downloading');
+
+          try {
+            const response = await apiService.submitUrl(url, outputDir, selectedOptions);
+
+            if (response.success) {
+              successCount++;
+              tracker.jobIdToUrl[response.job_id] = url;
+              uiManager.appendStatus(`✅ Added to queue: ${displayName}`, 'success');
+            } else {
+              errorCount++;
+              tracker.failedJobs++;
+              uiManager.appendStatus(`❌ Failed to queue ${displayName}: ${response.error || 'Unknown error'}`, 'error');
+            }
+          } catch (error) {
+            errorCount++;
+            tracker.failedJobs++;
+            console.error(`Error processing ${url}:`, error);
+            uiManager.appendStatus(`❌ Error processing ${displayName}: ${error.message || 'Unknown error'}`, 'error');
+          }
         }
+
+        // Show completion summary
+        if (successCount > 0) {
+          uiManager.appendStatus(`\n🎉 Successfully queued ${successCount} item(s) for download.`, 'success');
+          if (errorCount === 0) {
+            uiManager.updateProgressIndicator(100, 'completed');
+          }
+        }
+
+        if (errorCount > 0) {
+          const message = `\n⚠️ Failed to queue ${errorCount} item(s). Check the logs for details.`;
+          uiManager.appendStatus(message, 'warning');
+          uiManager.updateProgressIndicator(
+            Math.round((successCount / urls.length) * 100),
+            errorCount === urls.length ? 'error' : 'warning'
+          );
+        }
+
+        // If no errors, show waiting message
+        if (errorCount === 0) {
+          uiManager.updateProgressInfo('Waiting for downloads and conversions to finish...');
+        }
+
+      } catch (error) {
+        console.error('Error in form processing:', error);
+        uiManager.appendStatus(`❌ An unexpected error occurred: ${error.message || 'Please try again later.'}`, 'error');
+        uiManager.updateProgressIndicator(0, 'error');
+      } finally {
+        uiManager.setFormLoading(false);
       }
-
-      // Update progress info
-      uiManager.updateProgressInfo('Waiting for downloads and conversions to finish...');
-
-      // Reset button state
-      uiManager.setFormLoading(false);
     }
   };
 
