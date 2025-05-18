@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 // Import download module
 use crate::download;
+use crate::process::ProcessingOptions;
 
 // Create a static channel for broadcasting download progress updates
 static PROGRESS_CHANNEL: once_cell::sync::Lazy<(
@@ -92,11 +93,20 @@ pub async fn submit_url(Json(payload): Json<SubmitPayload>) -> Response {
 
     // Spawn a task to handle the download asynchronously
     tokio::spawn(async move {
+        // Create download options from the processing options
+        let download_options = download::DownloadOptions {
+            processing_options: ProcessingOptions::default(),
+            download_subtitles: options_clone.contains(&"add-subtitles".to_string()),
+            subtitle_language: Some("en".to_string()),
+            download_thumbnail: options_clone.contains(&"add-thumbnail".to_string()),
+            download_metadata: true,
+        };
+
         // Call the download function asynchronously with progress updates
-        let download_result = download::download_video_with_progress(
+        let download_result = download::download_media_with_progress(
             &url_clone,
             &target_dir_clone,
-            &options_clone,
+            &download_options,
             &job_id_clone,
         )
         .await;
@@ -104,7 +114,7 @@ pub async fn submit_url(Json(payload): Json<SubmitPayload>) -> Response {
         // Handle the download result
         match download_result {
             Ok(downloaded_file_path) => {
-                info!(job_id = %job_id_clone, file_path = %downloaded_file_path, "Video download successful");
+                info!(job_id = %job_id_clone, file_path = %downloaded_file_path.display(), "Video download successful");
                 // Send completion update
                 send_progress_update(
                     &job_id_clone,

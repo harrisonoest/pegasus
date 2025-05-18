@@ -3,38 +3,37 @@
 ## Frontend Implementation
 
 ### Core UI Components
-- [ ] Create main application layout with dark mode by default
-- [ ] Implement application header with name and version info
-- [ ] Design and implement responsive navigation
-- [ ] Create settings panel for application preferences
+- [x] Create main application layout with dark mode by default
+- [x] Implement application header with name and version info
+- [x] Design and implement responsive navigation
+- [x] Create settings panel for application preferences
 
 ### Input and Configuration
-- [ ] Implement URL input area with multi-line support
-  - [ ] Add URL validation with visual feedback
-  - [ ] Add clear all functionality
-  - [ ] Support pasting multiple URLs at once
-- [ ] Create output directory selector
-  - [ ] Add path validation
-  - [ ] Implement default directory handling
-- [ ] Build configuration preset system
-  - [ ] Add save/load preset functionality
-  - [ ] Implement preset management UI
+- [x] Implement URL input area with multi-line support
+  - [x] Add URL validation with visual feedback
+  - [x] Add clear all functionality
+  - [x] Support pasting multiple URLs at once
+- [x] Create output directory selector
+  - [x] Add path validation
+  - [x] Implement default directory handling
+- [x] Build configuration preset system
+  - [x] Add save/load preset functionality
+  - [x] Implement preset management UI
 
 ### Media Processing Options
-- [ ] Implement mode toggle (audio/video)
-- [ ] Video mode options UI:
-  - [ ] Quality selection dropdown (4K, 1080p, 720p, etc.)
-  - [ ] Metadata embedding toggle
-  - [ ] Subtitle embedding with language selection
-- [ ] Audio mode options UI:
-  - [ ] Format selection (MP3, AAC, FLAC, etc.)
-  - [ ] Bitrate selection (320kbps, 256kbps, etc.)
-  - [ ] Metadata embedding toggle
-  - [ ] Album art embedding
-  - [ ] Audio normalization option
+- [x] Implement mode toggle (audio/video)
+- [x] Video mode options UI:
+  - [x] Quality selection dropdown (high, medium, low)
+  - [x] Metadata embedding toggle
+  - [x] Subtitle embedding with language selection
+- [x] Audio mode options UI:
+  - [x] Format selection (MP3, M4A, Opus)
+  - [x] Bitrate selection (high, medium, low)
+  - [x] Metadata embedding toggle
+  - [x] Album art embedding
 
 ### Download Controls
-- [ ] Implement main download button with state management
+- [x] Implement main download button with state management
 - [ ] Implement download cancellation
 - [ ] Create download queue management
 
