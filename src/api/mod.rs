@@ -3,18 +3,38 @@
 
 pub mod handlers;
 
+use crate::queue_manager::DownloadQueue;
 use axum::{
     Router,
+    extract::State,
     extract::ws::WebSocketUpgrade,
     response::IntoResponse,
     routing::{get, get_service, post},
 };
+use handlers::ProgressUpdate;
+use std::sync::Arc;
+use tokio::sync::broadcast;
 use tower_http::services::ServeDir;
+
+/// Shared application state.
+#[derive(Clone)]
+pub struct AppState {
+    pub download_queue: Arc<DownloadQueue>,
+    pub progress_sender: broadcast::Sender<ProgressUpdate>,
+}
 
 /// Creates the main Axum application router.
 ///
 /// Configures routes for serving static frontend files and API endpoints.
-pub fn create_router() -> Router {
+pub fn create_router(
+    download_queue: Arc<DownloadQueue>,
+    progress_sender: broadcast::Sender<ProgressUpdate>,
+) -> Router {
+    // Create the shared state
+    let app_state = AppState {
+        download_queue,
+        progress_sender,
+    };
     tracing::info!("Creating Axum router");
 
     // Define the service to serve static files from the `static` directory
@@ -25,18 +45,22 @@ pub fn create_router() -> Router {
 
     // Build the router
     Router::new()
-        // Define the API route `/api/submit` which accepts POST requests
-        // It's linked to the `submit_url` handler function.
+        // --- API Routes ---
         .route("/api/submit", post(handlers::submit_url))
+        .route("/api/queue", get(handlers::get_queue_status))
+        .route("/api/downloads/:id/cancel", post(handlers::cancel_download))
         // WebSocket route for real-time download progress updates
         .route("/ws", get(ws_handler))
-        // Define a fallback service to serve static files for any other request.
-        // This allows serving index.html, styles.css, script.js, etc.
+        // --- Static File Serving ---
         .fallback_service(static_service)
+        // Add the application state to the router
+        .with_state(app_state)
 }
 
 /// WebSocket handler for real-time updates
-async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     // Accept the WebSocket connection and pass it to the handler
-    ws.on_upgrade(handlers::handle_socket_connection)
+    ws.on_upgrade(move |socket| {
+        handlers::handle_socket_connection(socket, state.progress_sender.subscribe())
+    })
 }

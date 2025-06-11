@@ -36,6 +36,15 @@ pub enum PegasusError {
     #[error("External command error: {0}")]
     ExternalCommandError(String),
 
+    #[error("Job not found: {0}")]
+    JobNotFound(String),
+
+    #[error("Job was cancelled by the user")]
+    Cancelled,
+
+    #[error("Queue error: {0}")]
+    QueueError(String),
+
     #[error("Unknown error: {0}")]
     Unknown(String),
 }

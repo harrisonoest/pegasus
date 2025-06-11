@@ -1,6 +1,7 @@
 // src/download/mod.rs
 
-use crate::api::handlers::send_progress_update;
+// use crate::api::handlers::send_progress_update; // TODO: Remove this and pass in progress sender
+use crate::api::handlers::ProgressUpdate;
 use crate::error::{PegasusError, Result};
 use crate::process::{self, AudioFormat, MediaQuality, ProcessingOptions};
 use regex::Regex;
@@ -9,7 +10,9 @@ use serde_json::Value;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 /// Supported media platforms
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,11 +51,38 @@ impl Default for DownloadOptions {
     }
 }
 
+/// Represents the various states a download job can be in.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum DownloadJobStatus {
+    Queued,
+    Starting,
+    Downloading,
+    Processing,
+    Completed,
+    Cancelled,
+    Error,
+}
+
+impl std::fmt::Display for DownloadJobStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DownloadJobStatus::Queued => write!(f, "Queued"),
+            DownloadJobStatus::Starting => write!(f, "Starting"),
+            DownloadJobStatus::Downloading => write!(f, "Downloading"),
+            DownloadJobStatus::Processing => write!(f, "Processing"),
+            DownloadJobStatus::Completed => write!(f, "Completed"),
+            DownloadJobStatus::Cancelled => write!(f, "Cancelled"),
+            DownloadJobStatus::Error => write!(f, "Error"),
+        }
+    }
+}
+
 /// Media download job information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DownloadJob {
     /// Unique job ID
-    pub job_id: String,
+    pub id: String,
     /// Media URL
     pub url: String,
     /// Output directory
@@ -62,9 +92,28 @@ pub struct DownloadJob {
     /// Platform (detected from URL)
     pub platform: Platform,
     /// Status of the job
-    pub status: String,
+    pub status: DownloadJobStatus,
+    /// A detailed message about the current status (e.g., error details).
+    pub status_message: Option<String>,
     /// Progress (0.0 - 1.0)
     pub progress: f32,
+}
+
+impl DownloadJob {
+    /// Create a new download job with a unique ID.
+    pub fn new(url: String, output_dir: PathBuf, options: DownloadOptions) -> Self {
+        let id = Uuid::new_v4().to_string();
+        Self {
+            id,
+            url: url.clone(),
+            output_dir,
+            options,
+            platform: detect_platform(&url),
+            status: DownloadJobStatus::Queued,
+            status_message: Some("Job is waiting in the queue.".to_string()),
+            progress: 0.0,
+        }
+    }
 }
 
 /// Gets video information from a URL using yt-dlp.
@@ -161,35 +210,6 @@ pub fn detect_platform(url: &str) -> Platform {
     }
 }
 
-/// Create a download job
-///
-/// # Arguments
-///
-/// * `url` - The URL of the media to download
-/// * `output_dir` - The directory where the downloaded file should be saved
-/// * `options` - The download options
-/// * `job_id` - A unique identifier for this job
-///
-/// # Returns
-///
-/// A new download job
-pub fn create_download_job(
-    url: &str,
-    output_dir: &Path,
-    options: DownloadOptions,
-    job_id: &str,
-) -> DownloadJob {
-    DownloadJob {
-        job_id: job_id.to_string(),
-        url: url.to_string(),
-        output_dir: output_dir.to_path_buf(),
-        options,
-        platform: detect_platform(url),
-        status: "pending".to_string(),
-        progress: 0.0,
-    }
-}
-
 /// Process a download job through the complete pipeline
 ///
 /// This function handles the entire download and processing pipeline:
@@ -204,52 +224,62 @@ pub fn create_download_job(
 /// # Returns
 ///
 /// A `Result` containing the path to the processed file
-pub async fn process_download_job(job: &DownloadJob) -> Result<PathBuf> {
+pub async fn process_download_job(
+    job: &DownloadJob,
+    progress_sender: &broadcast::Sender<ProgressUpdate>,
+) -> Result<PathBuf> {
     info!(
-        job_id = %job.job_id,
+        job_id = %job.id,
         url = %job.url,
         output_dir = ?job.output_dir,
         "Processing download job"
     );
 
     // Step 1: Download the media file
-    let downloaded_file =
-        download_media_with_progress(&job.url, &job.output_dir, &job.options, &job.job_id).await?;
+    let downloaded_file_path = download_media_with_progress(
+        &job.url,
+        &job.output_dir,
+        &job.options,
+        &job.id,
+        progress_sender,
+    )
+    .await?;
 
     // Step 2: Process the media file
-    let processed_file = process::process_media(
-        &downloaded_file,
+    let final_file_path = process::process_media(
+        &downloaded_file_path,
         &job.output_dir,
         &job.options.processing_options,
-        &job.job_id,
+        &job.id,
         &job.url,
+        progress_sender,
     )
     .await?;
 
     // Step 3: Clean up temporary files if needed
     // Only clean up if the processed file is different from the downloaded file
-    if downloaded_file != processed_file {
+    if downloaded_file_path != final_file_path {
         info!(
-            job_id = %job.job_id,
-            file = ?downloaded_file,
+            job_id = %job.id,
+            file = ?downloaded_file_path,
             "Cleaning up temporary file"
         );
 
         // Delete the downloaded file asynchronously
         // We don't want to fail the job if cleanup fails
-        tokio::fs::remove_file(&downloaded_file)
+        tokio::fs::remove_file(&downloaded_file_path)
             .await
             .unwrap_or_else(|e| {
                 warn!(
-                    job_id = %job.job_id,
-                    file = ?downloaded_file,
+                    job_id = %job.id,
+                    file = ?downloaded_file_path,
                     error = %e,
                     "Failed to clean up temporary file"
                 );
             });
     }
 
-    Ok(processed_file)
+    Ok(final_file_path)
 }
 
 /// Downloads media using the yt-dlp binary directly with progress updates.
@@ -260,6 +290,7 @@ pub async fn process_download_job(job: &DownloadJob) -> Result<PathBuf> {
 /// * `output_dir` - The directory where the downloaded file should be saved.
 /// * `options` - The download options.
 /// * `job_id` - A unique identifier for this download job.
+/// * `progress_sender` - The broadcast channel for sending progress updates
 ///
 /// # Returns
 ///
@@ -269,6 +300,7 @@ pub async fn download_media_with_progress(
     output_dir: &Path,
     options: &DownloadOptions,
     job_id: &str,
+    progress_sender: &broadcast::Sender<ProgressUpdate>,
 ) -> Result<PathBuf> {
     // Log the start of the download process with job ID
     info!(job_id = %job_id, url = %url, output_path = ?output_dir, options = ?options, "Attempting to download using yt-dlp binary with progress tracking");
@@ -284,7 +316,7 @@ pub async fn download_media_with_progress(
 
     // First, get video information to use for naming and thumbnails
     info!(job_id = %job_id, "Fetching video information");
-    send_progress_update(job_id, url, "info", 0.1, "Fetching video information...");
+    // send_progress_update(job_id, url, "info", 0.1, "Fetching video information...");
 
     let video_info = get_video_info(url).await?;
 
@@ -292,13 +324,13 @@ pub async fn download_media_with_progress(
     let safe_title = sanitize_filename(video_title);
     let duration = video_info["duration"].as_f64().unwrap_or(0.0) as f32;
 
-    send_progress_update(
-        job_id,
-        url,
-        "info",
-        0.2,
-        &format!("Found media: {}", video_title),
-    );
+    // send_progress_update(
+    //     job_id,
+    //     url,
+    //     "info",
+    //     0.2,
+    //     &format!("Found media: {}", video_title),
+    // );
 
     // Create a temporary filename for the downloaded file
     // We'll use a different extension based on whether we're downloading audio or video
@@ -319,13 +351,13 @@ pub async fn download_media_with_progress(
     // Add format selection based on audio/video mode
     if options.processing_options.audio_only {
         info!(job_id = %job_id, "Downloading audio only");
-        send_progress_update(
-            job_id,
-            url,
-            "downloading",
-            0.3,
-            "Starting audio download...",
-        );
+        // send_progress_update(
+        //     job_id,
+        //     url,
+        //     "downloading",
+        //     0.3,
+        //     "Starting audio download...",
+        // );
 
         // Extract audio
         cmd.arg("--extract-audio");
@@ -349,24 +381,22 @@ pub async fn download_media_with_progress(
         cmd.arg("--audio-quality").arg(quality);
     } else {
         info!(job_id = %job_id, "Downloading video");
-        send_progress_update(
-            job_id,
-            url,
-            "downloading",
-            0.3,
-            "Starting video download...",
-        );
+        // send_progress_update(
+        //     job_id,
+        //     url,
+        //     "downloading",
+        //     0.3,
+        //     "Starting video download...",
+        // );
 
-        // Select video quality based on options
+        // Select video quality – be more permissive: let yt-dlp choose the best
+        // container/codec; only limit resolution for Medium / Low so we avoid
+        // "Requested format is not available" errors.
         let format = match options.processing_options.video_quality {
-            Some(MediaQuality::High) => "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-            Some(MediaQuality::Medium) => {
-                "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best"
-            }
-            Some(MediaQuality::Low) => {
-                "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best"
-            }
-            None => "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best", // Default to best quality
+            Some(MediaQuality::High) => "bestvideo+bestaudio/best",
+            Some(MediaQuality::Medium) => "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+            Some(MediaQuality::Low) => "bestvideo[height<=480]+bestaudio/best[height<=480]/best",
+            None => "bestvideo+bestaudio/best", // Default to best quality
         };
         cmd.arg("-f").arg(format);
 
@@ -422,16 +452,21 @@ pub async fn download_media_with_progress(
         let job_id_clone = job_id.to_string();
         let url_clone = url.to_string();
         let duration_clone = duration;
+        let progress_sender_clone = progress_sender.clone();
         tokio::spawn(async move {
             let reader = BufReader::new(stdout);
-            parse_yt_dlp_progress(reader, &job_id_clone, &url_clone, duration_clone);
+            parse_yt_dlp_progress(
+                reader,
+                &job_id_clone,
+                &url_clone,
+                duration_clone,
+                progress_sender_clone,
+            );
         });
     }
 
     // Track errors from stderr
     if let Some(stderr) = child.stderr.take() {
-        let job_id_clone = job_id.to_string();
-        let url_clone = url.to_string();
         tokio::spawn(async move {
             let reader = BufReader::new(stderr);
             #[allow(clippy::manual_flatten)]
@@ -440,7 +475,8 @@ pub async fn download_media_with_progress(
                     debug!("yt-dlp stderr: {}", line);
                     // Only send error messages to the client if they seem important
                     if line.contains("ERROR") {
-                        send_progress_update(&job_id_clone, &url_clone, "warning", 0.0, &line);
+                        // TODO: Send progress update via broadcast channel
+                        // send_progress_update(&job_id_clone, &url_clone, "warning", 0.0, &line);
                     }
                 }
             }
@@ -473,7 +509,14 @@ pub async fn download_media_with_progress(
 /// * `job_id` - The job ID for the download
 /// * `url` - The URL being downloaded
 /// * `_duration` - The duration of the media in seconds (if known)
-fn parse_yt_dlp_progress<R: BufRead>(reader: R, job_id: &str, url: &str, _duration: f32) {
+/// * `progress_sender` - The broadcast channel for sending progress updates
+fn parse_yt_dlp_progress<R: BufRead>(
+    reader: R,
+    job_id: &str,
+    url: &str,
+    _duration: f32,
+    progress_sender: broadcast::Sender<ProgressUpdate>,
+) {
     // Regex patterns for progress extraction
     let download_regex = Regex::new(r"\[download\]\s+([\d.]+)%").unwrap();
     let eta_regex = Regex::new(r"ETA\s+([\d:]+)").unwrap();
@@ -508,13 +551,17 @@ fn parse_yt_dlp_progress<R: BufRead>(reader: R, job_id: &str, url: &str, _durati
                         }
 
                         // Send progress update
-                        send_progress_update(
-                            job_id,
-                            url,
-                            "downloading",
-                            normalized_progress,
-                            &message,
-                        );
+                        let update = ProgressUpdate {
+                            job_id: job_id.to_string(),
+                            url: url.to_string(),
+                            status: "downloading".to_string(),
+                            progress: normalized_progress,
+                            message,
+                        };
+
+                        if let Err(e) = progress_sender.send(update) {
+                            warn!("Failed to send progress update: {}", e);
+                        }
                     }
                 }
             }
@@ -522,7 +569,8 @@ fn parse_yt_dlp_progress<R: BufRead>(reader: R, job_id: &str, url: &str, _durati
             else if line.contains("[ffmpeg] Merging formats into")
                 || line.contains("Destination:")
             {
-                send_progress_update(job_id, url, "downloading", 0.9, "Finalizing download...");
+                // TODO: Send progress update via broadcast channel
+                // send_progress_update(job_id, url, "downloading", 0.9, "Finalizing download...");
             }
         }
     }
@@ -547,6 +595,7 @@ pub async fn download_video_with_progress(
     output_dir: &Path,
     processing_options: &[String],
     job_id: &str,
+    progress_sender: &broadcast::Sender<ProgressUpdate>,
 ) -> Result<String> {
     // Convert old-style processing options to new DownloadOptions
     let mut options = DownloadOptions::default();
@@ -567,7 +616,8 @@ pub async fn download_video_with_progress(
     }
 
     // Download the media using the new function
-    let path = download_media_with_progress(url, output_dir, &options, job_id).await?;
+    let path =
+        download_media_with_progress(url, output_dir, &options, job_id, progress_sender).await?;
 
     // Return the path as a string for backwards compatibility
     Ok(path.to_string_lossy().to_string())

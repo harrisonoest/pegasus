@@ -1,175 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pegasus</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-
-<body>
-  <div class="container">
-    <header>
-      <div class="header-top">
-        <div class="title-container">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pegasus</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="logo-title">
           <h1>Pegasus</h1>
-          <img src="pegasus.svg" alt="Pegasus Logo" id="header-logo" class="filter-blue" />
+          <img
+            src="pegasus.svg"
+            alt="Pegasus Logo"
+            id="header-logo"
+            class="filter-blue"
+          />
         </div>
-        <div class="version-info">v1.0.0</div>
-      </div>
-      <p class="tagline">Swiftly process and deliver your media files</p>
-      <nav class="main-nav">
-        <ul>
-          <li><a href="#" class="nav-link active" data-section="download">Download</a></li>
-          <li><a href="#" class="nav-link" data-section="history">History</a></li>
-          <li><a href="#" class="nav-link" data-section="settings">Settings</a></li>
-        </ul>
-      </nav>
-    </header>
-
-    <main>
-      <!-- Download Section -->
-      <section id="download-section" class="content-section">
-        <form id="uploadForm">
-          <div class="form-group">
-            <label for="mediaUrls">Media URLs (one per line)</label>
-            <textarea id="mediaUrls" name="mediaUrls" rows="5" placeholder="https://example.com/media1.mp4
-https://example.com/media2.mp3
-https://example.com/playlist1" required></textarea>
-          </div>
-
-          <div class="form-group">
-            <label for="outputDir">Output Directory</label>
-            <input type="text" id="outputDir" name="outputDir" placeholder="/home/user/media" />
-          </div>
-
-          <div class="processing-options">
-            <h2>Processing Options</h2>
-
-            <div class="media-type-selector">
-              <div class="option primary-option">
-                <input type="checkbox" id="audio-only" name="options" value="audio-only" />
-                <label for="audio-only">Audio Only?</label>
-              </div>
-            </div>
-
-            <div class="options-section" id="video-options">
-              <h3>Video Options</h3>
-              <div class="options-grid">
-                <div class="option select-option">
-                  <label for="video-quality">Quality:</label>
-                  <select id="video-quality" name="video-quality">
-                    <option value="video-quality-high">High</option>
-                    <option value="video-quality-medium">Medium</option>
-                    <option value="video-quality-low">Low</option>
-                  </select>
-                </div>
-                <div class="option">
-                  <input type="checkbox" id="video-embed-subs" name="options" value="video-embed-subs" />
-                  <label for="video-embed-subs">Embed Subtitles</label>
-                </div>
-                <div class="option">
-                  <input type="checkbox" id="video-add-thumbnail" name="options" value="add-thumbnail" />
-                  <label for="video-add-thumbnail">Add Thumbnail</label>
-                </div>
-                <div class="option">
-                  <input type="checkbox" id="video-embed-metadata" name="options" value="metadata" />
-                  <label for="video-embed-metadata">Embed Metadata</label>
-                </div>
-              </div>
-            </div>
-
-            <div class="options-section" id="audio-options">
-              <h3>Audio Options</h3>
-              <div class="options-grid">
-                <div class="option select-option">
-                  <label for="audio-format">Format:</label>
-                  <select id="audio-format" name="audio-format">
-                    <option value="audio-format-mp3">MP3</option>
-                    <option value="audio-format-m4a">M4A</option>
-                    <option value="audio-format-opus">Opus</option>
-                  </select>
-                </div>
-                <div class="option select-option">
-                  <label for="audio-quality">Quality:</label>
-                  <select id="audio-quality" name="audio-quality">
-                    <option value="audio-quality-high">High</option>
-                    <option value="audio-quality-medium">Medium</option>
-                    <option value="audio-quality-low">Low</option>
-                  </select>
-                </div>
-                <div class="option">
-                  <input type="checkbox" id="audio-add-thumbnail" name="options" value="add-thumbnail" />
-                  <label for="audio-add-thumbnail">Add Thumbnail</label>
-                </div>
-                <div class="option">
-                  <input type="checkbox" id="audio-embed-metadata" name="options" value="metadata" checked />
-                  <label for="audio-embed-metadata">Embed Metadata</label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Progress indicator bar -->
-          <div id="status" class="status">
-            <div id="progress-info" class="progress-info"></div>
-            <div class="global-progress-container">
-              <div class="global-progress-bar">
-                <div class="progress-indicator"></div>
-              </div>
-            </div>
-          </div>
-
-          <button type="submit" id="submitBtn" class="btn btn-primary">Start Download</button>
-        </form>
-      </section>
-
-      <!-- History Section -->
-      <section id="history-section" class="content-section" style="display: none;">
-        <div class="card">
-          <h2>Download History</h2>
-          <div class="history-list">
-            <p class="empty-state">No download history available</p>
-            <!-- History items will be added here dynamically -->
-          </div>
-        </div>
-      </section>
-
-      <!-- Settings Section -->
-      <section id="settings-section" class="content-section" style="display: none;">
-        <div class="card">
-          <h2>Application Settings</h2>
-          <form id="settings-form">
-            <div class="form-group">
-              <label for="default-download-dir">Default Download Directory</label>
-              <div class="input-group">
-                <input type="text" id="default-download-dir" name="default-download-dir"
-                  placeholder="e.g., /home/username/Downloads" />
-                <button type="button" class="btn btn-secondary" id="browse-dir">Browse</button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="theme-preference">Theme</label>
-              <select id="theme-preference" name="theme-preference">
-                <option value="system">System Default</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Save Settings</button>
-              <button type="button" class="btn btn-secondary reset-btn" id="reset-settings">Reset to Defaults</button>
-            </div>
+        <p class="tagline">Swiftly process and deliver your media files</p>
+        <nav class="main-nav">
+          <ul>
+            <li><a href="#submit-section">Submit</a></li>
+            <li><a href="#queue-section">Queue</a></li>
+            <li><a href="#settings-section">Settings</a></li>
+          </ul>
+        </nav>
+      </header>
+      <main>
+        <section id="submit-section">
+          <h2>Submit a URL</h2>
+          <form id="download-form">
+            <input
+              type="text"
+              id="url"
+              placeholder="Enter media URL (e.g., YouTube, SoundCloud)"
+              required
+            />
+            <button type="submit">Download</button>
           </form>
+          <div id="response"></div>
+        </section>
+
+        <section id="queue-section">
+          <h2>Download Queue</h2>
+          <div id="queue-container"></div>
+        </section>
+
+        <section id="settings-section">
+          <h2>Settings</h2>
+          <p>Settings will be available in a future version.</p>
+        </section>
+      </main>
+    </div>
+
+    <template id="job-template">
+      <div class="job-item" data-job-id="">
+        <div class="job-info">
+          <span class="job-url"></span>
+          <span class="job-message"></span>
         </div>
-      </section>
-    </main>
-  </div>
+        <div class="job-status"></div>
+        <div class="job-progress-container">
+          <progress class="job-progress" value="0" max="1"></progress>
+        </div>
+        <div class="job-actions">
+          <button class="cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </template>
 
-  <script src="script.js" defer></script>
-</body>
-
+    <script src="script.js"></script>
+  </body>
 </html>

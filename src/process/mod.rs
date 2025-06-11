@@ -1,14 +1,15 @@
 // src/process/mod.rs
 // This module handles media processing using ffmpeg.
 
-use crate::api::handlers::send_progress_update;
+use crate::api::handlers::ProgressUpdate;
 use crate::error::{PegasusError, Result};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use tokio::sync::broadcast;
 use tokio::task;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 /// Media quality options for video and audio
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,6 +81,7 @@ pub async fn process_media(
     options: &ProcessingOptions,
     job_id: &str,
     url: &str,
+    progress_sender: &broadcast::Sender<ProgressUpdate>,
 ) -> Result<PathBuf> {
     info!(
         job_id = %job_id,
@@ -98,13 +100,14 @@ pub async fn process_media(
     }
 
     // Send progress update
-    send_progress_update(
-        job_id,
-        url,
-        "processing",
-        0.0,
-        "Starting media processing...",
-    );
+    // TODO: Send progress update via broadcast channel
+    // send_progress_update(
+    //     job_id,
+    //     url,
+    //     "processing",
+    //     0.0,
+    //     "Starting media processing...",
+    // );
 
     // Get file name without extension
     let file_stem = input_path
@@ -121,6 +124,7 @@ pub async fn process_media(
             options.clone(),
             job_id,
             url,
+            progress_sender,
         )
         .await?
     } else {
@@ -132,12 +136,14 @@ pub async fn process_media(
             options.clone(),
             job_id,
             url,
+            progress_sender,
         )
         .await?
     };
 
     // Send completion update
-    send_progress_update(job_id, url, "processing", 1.0, "Media processing completed");
+    // TODO: Send progress update via broadcast channel
+    // send_progress_update(job_id, url, "processing", 1.0, "Media processing completed");
 
     Ok(output_path)
 }
@@ -150,6 +156,7 @@ async fn process_audio(
     options: ProcessingOptions,
     job_id: &str,
     url: &str,
+    progress_sender: &broadcast::Sender<ProgressUpdate>,
 ) -> Result<PathBuf> {
     // Determine audio format extension
     let extension = match options.audio_format {
@@ -181,13 +188,14 @@ async fn process_audio(
     );
 
     // Send progress update
-    send_progress_update(
-        job_id,
-        url,
-        "processing",
-        0.2,
-        &format!("Converting to {} format...", extension.to_uppercase()),
-    );
+    // TODO: Send progress update via broadcast channel
+    // send_progress_update(
+    //     job_id,
+    //     url,
+    //     "processing",
+    //     0.2,
+    //     &format!("Converting to {} format...", extension.to_uppercase()),
+    // );
 
     // Build FFmpeg command
     let mut cmd = Command::new("ffmpeg");
@@ -226,6 +234,7 @@ async fn process_audio(
     let output_path_clone = output_path.clone();
     let job_id_clone = job_id.to_string();
     let url_clone = url.to_string();
+    let progress_sender_clone = progress_sender.clone();
 
     // Execute FFmpeg in a blocking task
     task::spawn_blocking(move || {
@@ -253,13 +262,17 @@ async fn process_audio(
                     // Parse progress information
                     if line.contains("time=") {
                         if let Some(progress) = parse_ffmpeg_progress(&line) {
-                            send_progress_update(
-                                &job_id_clone,
-                                &url_clone,
-                                "processing",
-                                0.2 + (progress * 0.7), // Scale to 20%-90% of the processing stage
-                                &format!("Converting audio: {:.0}%", progress * 100.0),
-                            );
+                            let update = ProgressUpdate {
+                                job_id: job_id_clone.clone(),
+                                url: url_clone.clone(),
+                                status: "processing".to_string(),
+                                progress: 0.2 + (progress * 0.7), // Scale to 20%-90% of the processing stage
+                                message: format!("Converting audio: {:.0}%", progress * 100.0),
+                            };
+
+                            if let Err(e) = progress_sender_clone.send(update) {
+                                warn!("Failed to send progress update: {}", e);
+                            }
                         }
                     }
                 }
@@ -281,13 +294,14 @@ async fn process_audio(
 
         // Process thumbnail if requested
         if options.embed_thumbnail {
-            send_progress_update(
-                &job_id_clone,
-                &url_clone,
-                "processing",
-                0.9,
-                "Adding thumbnail...",
-            );
+            // TODO: Send progress update via broadcast channel
+            // send_progress_update(
+            //     &job_id_clone,
+            //     &url_clone,
+            //     "processing",
+            //     0.9,
+            //     "Adding thumbnail...",
+            // );
 
             // For MP3, we need to use a separate tool like AtomicParsley
             // For M4A/AAC, FFmpeg can handle it directly
@@ -311,6 +325,7 @@ async fn process_video(
     options: ProcessingOptions,
     job_id: &str,
     url: &str,
+    progress_sender: &broadcast::Sender<ProgressUpdate>,
 ) -> Result<PathBuf> {
     // Create output path
     let output_filename = format!("{}.mp4", file_stem);
@@ -334,7 +349,8 @@ async fn process_video(
     );
 
     // Send progress update
-    send_progress_update(job_id, url, "processing", 0.2, "Converting video format...");
+    // TODO: Send progress update via broadcast channel
+    // send_progress_update(job_id, url, "processing", 0.2, "Converting video format...");
 
     // Build FFmpeg command
     let mut cmd = Command::new("ffmpeg");
@@ -377,6 +393,7 @@ async fn process_video(
     let output_path_clone = output_path.clone();
     let job_id_clone = job_id.to_string();
     let url_clone = url.to_string();
+    let progress_sender_clone = progress_sender.clone();
 
     // Execute FFmpeg in a blocking task
     task::spawn_blocking(move || {
@@ -404,13 +421,17 @@ async fn process_video(
                     // Parse progress information
                     if line.contains("time=") {
                         if let Some(progress) = parse_ffmpeg_progress(&line) {
-                            send_progress_update(
-                                &job_id_clone,
-                                &url_clone,
-                                "processing",
-                                0.2 + (progress * 0.8), // Scale to 20%-100% of the processing stage
-                                &format!("Converting video: {:.0}%", progress * 100.0),
-                            );
+                            let update = ProgressUpdate {
+                                job_id: job_id_clone.clone(),
+                                url: url_clone.clone(),
+                                status: "processing".to_string(),
+                                progress: 0.2 + (progress * 0.7), // Scale to 20%-90% of the processing stage
+                                message: format!("Converting video: {:.0}%", progress * 100.0),
+                            };
+
+                            if let Err(e) = progress_sender_clone.send(update) {
+                                warn!("Failed to send progress update: {}", e);
+                            }
                         }
                     }
                 }

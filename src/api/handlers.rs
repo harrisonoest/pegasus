@@ -1,9 +1,16 @@
 // src/api/handlers.rs
 // Contains the handler functions for API endpoints.
 
+use super::AppState;
+use crate::download::{DownloadJob, DownloadOptions};
+use crate::error::PegasusError;
+use crate::process::ProcessingOptions;
 use axum::{
     Json,
-    extract::ws::{Message, WebSocket},
+    extract::{
+        Path, State,
+        ws::{Message, WebSocket},
+    },
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -12,20 +19,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::sync::broadcast;
 use tracing::{debug, error, info};
-use uuid::Uuid;
-
-// Import download module
-use crate::download;
-use crate::process::ProcessingOptions;
-
-// Create a static channel for broadcasting download progress updates
-static PROGRESS_CHANNEL: once_cell::sync::Lazy<(
-    broadcast::Sender<ProgressUpdate>,
-    broadcast::Receiver<ProgressUpdate>,
-)> = once_cell::sync::Lazy::new(|| {
-    let (tx, rx) = broadcast::channel(100);
-    (tx, rx)
-});
 
 // Define the structure expected in the JSON request body from the frontend
 #[derive(Deserialize, Debug)]
@@ -53,121 +46,93 @@ pub struct ProgressUpdate {
     pub message: String,
 }
 
-// Updated handler function for the POST /api/submit route.
-// It now accepts a JSON payload matching the SubmitPayload struct.
-// Marked as async because it now calls the async download_video function.
-pub async fn submit_url(Json(payload): Json<SubmitPayload>) -> Response {
-    // Log the received payload for debugging using tracing::info!
-    // Include payload details in structured logging.
-    tracing::info!(media_url = %payload.media_url, output_dir = ?payload.output_dir, processing_options = ?payload.processing_options, "Received submission payload");
+/// Handler for the POST /api/submit route.
+///
+/// Adds a new download job to the queue.
+/// Handler for the POST /api/submit route.
+///
+/// Adds a new download job to the queue.
+pub async fn submit_url(
+    State(state): State<AppState>,
+    Json(payload): Json<SubmitPayload>,
+) -> Response {
+    info!(media_url = %payload.media_url, "Received submission");
 
-    // TODO: Validate the input (e.g., URL format, output_dir validity)
-
-    // Generate a unique job ID
-    let job_id = Uuid::new_v4().to_string();
-    info!(job_id = %job_id, "Generated new job ID");
-
-    // --- Call Download Logic ---
     // Define a temporary download directory
     let download_base_dir = PathBuf::from("/tmp/pegasus_downloads");
-    // Use the output_dir from payload if provided, otherwise use a default within the base dir
     let target_download_dir = match &payload.output_dir {
         Some(dir) => download_base_dir.join(dir),
         None => download_base_dir.join("default"),
     };
 
-    // Send initial progress update
-    send_progress_update(
-        &job_id,
-        &payload.media_url,
-        "starting",
-        0.0,
-        "Preparing download...",
-    );
+    // Create download options from the processing options
+    let download_options = DownloadOptions {
+        processing_options: ProcessingOptions::default(), // TODO: Map from payload
+        download_subtitles: payload
+            .processing_options
+            .contains(&"add-subtitles".to_string()),
+        subtitle_language: Some("en".to_string()),
+        download_thumbnail: payload
+            .processing_options
+            .contains(&"add-thumbnail".to_string()),
+        download_metadata: true,
+    };
 
-    // Clone values for the async task
-    let job_id_clone = job_id.clone();
-    let url_clone = payload.media_url.clone();
-    let target_dir_clone = target_download_dir.clone();
-    let options_clone = payload.processing_options.clone();
+    // Create a new download job
+    let job = DownloadJob::new(payload.media_url, target_download_dir, download_options);
+    let job_id = job.id.clone();
 
-    // Spawn a task to handle the download asynchronously
-    tokio::spawn(async move {
-        // Create download options from the processing options
-        let download_options = download::DownloadOptions {
-            processing_options: ProcessingOptions::default(),
-            download_subtitles: options_clone.contains(&"add-subtitles".to_string()),
-            subtitle_language: Some("en".to_string()),
-            download_thumbnail: options_clone.contains(&"add-thumbnail".to_string()),
-            download_metadata: true,
-        };
-
-        // Call the download function asynchronously with progress updates
-        let download_result = download::download_media_with_progress(
-            &url_clone,
-            &target_dir_clone,
-            &download_options,
-            &job_id_clone,
-        )
-        .await;
-
-        // Handle the download result
-        match download_result {
-            Ok(downloaded_file_path) => {
-                info!(job_id = %job_id_clone, file_path = %downloaded_file_path.display(), "Video download successful");
-                // Send completion update
-                send_progress_update(
-                    &job_id_clone,
-                    &url_clone,
-                    "completed",
-                    1.0,
-                    "Download completed successfully",
-                );
-                // TODO: Trigger processing and transfer steps with downloaded_file_path
-            }
-            Err(e) => {
-                error!(job_id = %job_id_clone, error = %e, "Video download failed");
-                // Send error update
-                send_progress_update(
-                    &job_id_clone,
-                    &url_clone,
-                    "error",
-                    0.0,
-                    &format!("Download failed: {}", e),
-                );
-            }
+    // Add the job to the queue
+    match state.download_queue.add_job(job).await {
+        Ok(_) => {
+            info!(job_id = %job_id, "Successfully added job to queue");
+            let response_body = SubmitResponse {
+                message: "Submission received and job queued.".to_string(),
+                job_id,
+            };
+            (StatusCode::ACCEPTED, Json(response_body)).into_response()
         }
-    });
-
-    // Return an immediate response with the job ID
-    let response_body = SubmitResponse {
-        message: "Submission received and download started.".to_string(),
-        job_id,
-    };
-    (StatusCode::OK, Json(response_body)).into_response()
-}
-
-/// Helper function to send progress updates to all connected WebSocket clients
-pub fn send_progress_update(job_id: &str, url: &str, status: &str, progress: f32, message: &str) {
-    let update = ProgressUpdate {
-        job_id: job_id.to_string(),
-        url: url.to_string(),
-        status: status.to_string(),
-        progress,
-        message: message.to_string(),
-    };
-
-    // Send the update to all subscribers
-    if let Err(e) = PROGRESS_CHANNEL.0.send(update) {
-        debug!("Failed to broadcast progress update: {}", e);
+        Err(e) => {
+            error!(error = %e, "Failed to add job to queue");
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
+        }
     }
 }
 
-/// Handle WebSocket connections for real-time progress updates
-pub async fn handle_socket_connection(mut socket: WebSocket) {
-    // Subscribe to the progress channel
-    let mut rx = PROGRESS_CHANNEL.0.subscribe();
+/// Handler for GET /api/queue.
+///
+/// Returns the current state of all jobs in the queue.
+pub async fn get_queue_status(State(state): State<AppState>) -> impl IntoResponse {
+    let jobs = state.download_queue.get_all_jobs();
+    (StatusCode::OK, Json(jobs))
+}
 
+/// Handler for POST /api/downloads/:id/cancel.
+///
+/// Cancels a running or queued download job.
+pub async fn cancel_download(
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+) -> impl IntoResponse {
+    info!(job_id = %job_id, "Received cancellation request");
+    match state.download_queue.cancel_job(&job_id).await {
+        Ok(_) => (StatusCode::OK, "Job cancellation initiated.").into_response(),
+        Err(PegasusError::JobNotFound(_)) => {
+            (StatusCode::NOT_FOUND, "Job not found.").into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to cancel job: {}", e),
+        )
+            .into_response(),
+    }
+}
+
+/// Handle WebSocket connections for real-time progress updates.
+pub async fn handle_socket_connection(
+    mut socket: WebSocket,
+    mut rx: broadcast::Receiver<ProgressUpdate>,
+) {
     info!("New WebSocket client connected");
 
     // Send a welcome message
@@ -184,36 +149,29 @@ pub async fn handle_socket_connection(mut socket: WebSocket) {
     // Main WebSocket message loop
     loop {
         tokio::select! {
-            // Handle incoming messages from the client
+            // Handle incoming messages from the client (e.g., ping/pong)
             Some(msg) = socket.next() => {
-                match msg {
-                    Ok(Message::Close(_)) => {
-                        info!("WebSocket client disconnected");
-                        break;
-                    },
-                    Ok(_) => {},
-                    Err(e) => {
-                        error!("WebSocket error: {}", e);
-                        break;
-                    }
+                if let Ok(Message::Close(_)) = msg {
+                    info!("WebSocket client disconnected");
+                    break;
                 }
             },
-            // Handle progress updates from the channel
+            // Handle progress updates from the broadcast channel
             Ok(update) = rx.recv() => {
-                // Serialize the update to JSON
                 match serde_json::to_string(&update) {
                     Ok(json) => {
-                        // Send the update to the client
-                        if let Err(e) = socket.send(Message::Text(json)).await {
-                            error!("Failed to send progress update: {}", e);
+                        if socket.send(Message::Text(json)).await.is_err() {
+                            debug!("WebSocket client disconnected (send failed)");
                             break;
                         }
                     },
-                    Err(e) => {
-                        error!("Failed to serialize progress update: {}", e);
-                    }
+                    Err(e) => error!(error = %e, "Failed to serialize progress update"),
                 }
             },
+            // Stop the loop if the broadcast channel is closed
+            else => {
+                break;
+            }
         }
     }
 }

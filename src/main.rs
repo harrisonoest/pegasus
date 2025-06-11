@@ -7,13 +7,20 @@ pub mod config;
 pub mod download;
 pub mod error;
 pub mod process;
+pub mod queue_manager;
+pub mod task_manager;
 pub mod transfer;
 
 use std::path::PathBuf;
 
 // Use common types
+use crate::api::handlers::ProgressUpdate;
+use crate::queue_manager::DownloadQueue;
+use crate::task_manager::TaskManager;
 use config::Config;
 use error::Result;
+use std::sync::Arc;
+use tokio::sync::broadcast;
 
 // Import Axum and Tokio listener
 use axum::serve; // Updated import for serve
@@ -55,8 +62,24 @@ async fn main() -> Result<()> {
     // Install ffmpeg and yt-dlp
     install_binaries().await?;
 
-    // Create the Axum router
-    let app = api::create_router();
+    // --- Application State Setup ---
+    info!("Initializing application state...");
+    // Create a broadcast channel for real-time progress updates to clients.
+    let (progress_sender, _) = broadcast::channel::<ProgressUpdate>(100);
+
+    // Create the TaskManager which will track running child processes.
+    let task_manager = TaskManager::new();
+
+    // Create the DownloadQueue, which orchestrates the entire download and processing flow.
+    let download_queue = Arc::new(DownloadQueue::new(task_manager, progress_sender.clone()));
+
+    // Spawn the background worker task for the download queue.
+    download_queue.clone().spawn_worker();
+    info!("Download queue worker started.");
+    // --- End Application State Setup ---
+
+    // Create the Axum router, passing in the application state
+    let app = api::create_router(download_queue, progress_sender);
 
     // Read server port from environment variable, defaulting to 8000
     let port = std::env::var("SERVER_PORT")
