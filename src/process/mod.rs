@@ -268,6 +268,8 @@ async fn process_audio(
                                 status: "processing".to_string(),
                                 progress: 0.2 + (progress * 0.7), // Scale to 20%-90% of the processing stage
                                 message: format!("Converting audio: {:.0}%", progress * 100.0),
+                                speed: None,
+                                eta: None,
                             };
 
                             if let Err(e) = progress_sender_clone.send(update) {
@@ -427,6 +429,8 @@ async fn process_video(
                                 status: "processing".to_string(),
                                 progress: 0.2 + (progress * 0.7), // Scale to 20%-90% of the processing stage
                                 message: format!("Converting video: {:.0}%", progress * 100.0),
+                                speed: None,
+                                eta: None,
                             };
 
                             if let Err(e) = progress_sender_clone.send(update) {

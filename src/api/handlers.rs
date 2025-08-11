@@ -4,7 +4,7 @@
 use super::AppState;
 use crate::download::{DownloadJob, DownloadOptions};
 use crate::error::PegasusError;
-use crate::process::ProcessingOptions;
+use crate::process::{ProcessingOptions, MediaQuality, AudioFormat};
 use axum::{
     Json,
     extract::{
@@ -20,13 +20,35 @@ use std::path::PathBuf;
 use tokio::sync::broadcast;
 use tracing::{debug, error, info};
 
+// Define the structure for download options from frontend
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FrontendDownloadOptions {
+    mode: String, // "video" or "audio"
+    
+    // Video options
+    video_quality: Option<String>,
+    embed_subtitles: Option<bool>,
+    subtitle_language: Option<String>,
+    embed_chapters: Option<bool>,
+    
+    // Audio options
+    audio_format: Option<String>,
+    audio_quality: Option<String>,
+    add_thumbnail: Option<bool>,
+    normalize_audio: Option<bool>,
+    
+    // Common options
+    embed_metadata: Option<bool>,
+}
+
 // Define the structure expected in the JSON request body from the frontend
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SubmitPayload {
     media_url: String,
     output_dir: Option<String>,
-    processing_options: Vec<String>,
+    download_options: Option<FrontendDownloadOptions>,
 }
 
 // Define a struct for the JSON response
@@ -44,6 +66,70 @@ pub struct ProgressUpdate {
     pub status: String,
     pub progress: f32,
     pub message: String,
+    pub speed: Option<String>,
+    pub eta: Option<String>,
+}
+
+/// Convert frontend download options to backend DownloadOptions
+fn convert_frontend_options(frontend_opts: &FrontendDownloadOptions) -> DownloadOptions {
+    let is_audio_mode = frontend_opts.mode == "audio";
+    
+    // Map video quality
+    let video_quality = if !is_audio_mode {
+        match frontend_opts.video_quality.as_deref() {
+            Some("best") | Some("2160") | Some("1080") => Some(MediaQuality::High),
+            Some("720") | Some("480") => Some(MediaQuality::Medium),
+            Some("360") | _ => Some(MediaQuality::Low),
+        }
+    } else {
+        None
+    };
+    
+    // Map audio format
+    let audio_format = if is_audio_mode {
+        match frontend_opts.audio_format.as_deref() {
+            Some("mp3") => Some(AudioFormat::MP3),
+            Some("m4a") | Some("aac") => Some(AudioFormat::M4A),
+            Some("ogg") | Some("opus") => Some(AudioFormat::Opus),
+            _ => Some(AudioFormat::MP3), // default
+        }
+    } else {
+        None
+    };
+    
+    // Map audio quality
+    let audio_quality = if is_audio_mode {
+        match frontend_opts.audio_quality.as_deref() {
+            Some("320") | Some("best") => Some(MediaQuality::High),
+            Some("256") | Some("192") => Some(MediaQuality::Medium),
+            Some("128") | Some("96") | _ => Some(MediaQuality::Low),
+        }
+    } else {
+        None
+    };
+    
+    let processing_options = ProcessingOptions {
+        audio_only: is_audio_mode,
+        video_quality,
+        audio_format,
+        audio_quality,
+        embed_metadata: frontend_opts.embed_metadata.unwrap_or(true),
+        embed_subtitles: frontend_opts.embed_subtitles.unwrap_or(false),
+        embed_thumbnail: frontend_opts.add_thumbnail.unwrap_or(true),
+        subtitle_language: frontend_opts.subtitle_language.clone(),
+    };
+    
+    DownloadOptions {
+        processing_options,
+        download_subtitles: frontend_opts.embed_subtitles.unwrap_or(false),
+        subtitle_language: frontend_opts.subtitle_language.clone().or_else(|| Some("en".to_string())),
+        download_thumbnail: if is_audio_mode { 
+            frontend_opts.add_thumbnail.unwrap_or(true) 
+        } else { 
+            false 
+        },
+        download_metadata: frontend_opts.embed_metadata.unwrap_or(true),
+    }
 }
 
 /// Handler for the POST /api/submit route.
@@ -65,17 +151,11 @@ pub async fn submit_url(
         None => download_base_dir.join("default"),
     };
 
-    // Create download options from the processing options
-    let download_options = DownloadOptions {
-        processing_options: ProcessingOptions::default(), // TODO: Map from payload
-        download_subtitles: payload
-            .processing_options
-            .contains(&"add-subtitles".to_string()),
-        subtitle_language: Some("en".to_string()),
-        download_thumbnail: payload
-            .processing_options
-            .contains(&"add-thumbnail".to_string()),
-        download_metadata: true,
+    // Convert frontend options to backend structures
+    let download_options = if let Some(frontend_opts) = &payload.download_options {
+        convert_frontend_options(frontend_opts)
+    } else {
+        DownloadOptions::default()
     };
 
     // Create a new download job

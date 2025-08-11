@@ -535,19 +535,19 @@ fn parse_yt_dlp_progress<R: BufRead>(
                         // Normalize progress to 0.3-0.9 range (download phase)
                         let normalized_progress = 0.3 + (percent / 100.0) * 0.6;
 
-                        // Extract ETA and speed if available
+                        let eta_val = eta_regex
+                            .captures(&line)
+                            .and_then(|c| c.get(1).map(|m| m.as_str().to_string()));
+                        let speed_val = speed_regex
+                            .captures(&line)
+                            .and_then(|c| c.get(1).map(|m| m.as_str().to_string()));
+
                         let mut message = format!("Downloading: {:.1}%", percent);
-
-                        if let Some(eta_captures) = eta_regex.captures(&line) {
-                            if let Some(eta) = eta_captures.get(1) {
-                                message.push_str(&format!(" (ETA: {})", eta.as_str()));
-                            }
+                        if let Some(ref eta) = eta_val {
+                            message.push_str(&format!(" (ETA: {})", eta));
                         }
-
-                        if let Some(speed_captures) = speed_regex.captures(&line) {
-                            if let Some(speed) = speed_captures.get(1) {
-                                message.push_str(&format!(" at {}", speed.as_str()));
-                            }
+                        if let Some(ref speed) = speed_val {
+                            message.push_str(&format!(" at {}", speed));
                         }
 
                         // Send progress update
@@ -557,6 +557,8 @@ fn parse_yt_dlp_progress<R: BufRead>(
                             status: "downloading".to_string(),
                             progress: normalized_progress,
                             message,
+                            speed: speed_val,
+                            eta: eta_val,
                         };
 
                         if let Err(e) = progress_sender.send(update) {

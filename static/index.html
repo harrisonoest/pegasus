@@ -23,7 +23,7 @@
           <ul>
             <li><a href="#submit-section">Submit</a></li>
             <li><a href="#queue-section">Queue</a></li>
-            <li><a href="#settings-section">Settings</a></li>
+            <li><a href="#history-section">History</a></li>
           </ul>
         </nav>
       </header>
@@ -37,6 +37,113 @@
               placeholder="Enter media URL (e.g., YouTube, SoundCloud)"
               required
             />
+            
+            <!-- Download Options Section -->
+            <div class="processing-options">
+              <h2>Download Options</h2>
+              
+              <!-- Mode Toggle -->
+              <div class="media-type-selector">
+                <div class="primary-option">
+                  <label>
+                    <input type="radio" name="media-mode" class="mode-radio-button" id="video-mode" value="video" checked>
+                    Video Mode
+                  </label>
+                </div>
+                <div class="primary-option">
+                  <label>
+                    <input type="radio" name="media-mode" class="mode-radio-button" id="audio-mode" value="audio">
+                    Audio Mode
+                  </label>
+                </div>
+              </div>
+
+              <!-- Video Options -->
+              <div id="video-options" class="options-section">
+                <h3>Video Options</h3>
+                <div class="options-grid">
+                  <div class="select-option">
+                    <label for="video-quality">Quality:</label>
+                    <select id="video-quality">
+                      <option value="best">Best Available</option>
+                      <option value="2160">4K (2160p)</option>
+                      <option value="1080">1080p</option>
+                      <option value="720">720p</option>
+                      <option value="480">480p</option>
+                      <option value="360">360p</option>
+                    </select>
+                  </div>
+                  <div class="option">
+                    <input type="checkbox" id="video-metadata" checked>
+                    <label for="video-metadata">Embed metadata (title, artist, etc.)</label>
+                  </div>
+                  <div class="option">
+                    <input type="checkbox" id="video-subtitles">
+                    <label for="video-subtitles">Embed subtitles</label>
+                  </div>
+                  <div class="select-option">
+                    <label for="subtitle-language">Subtitle Language:</label>
+                    <select id="subtitle-language">
+                      <option value="en">English</option>
+                      <option value="es">Spanish</option>
+                      <option value="fr">French</option>
+                      <option value="de">German</option>
+                      <option value="it">Italian</option>
+                      <option value="pt">Portuguese</option>
+                      <option value="ru">Russian</option>
+                      <option value="ja">Japanese</option>
+                      <option value="ko">Korean</option>
+                      <option value="zh">Chinese</option>
+                    </select>
+                  </div>
+                  <div class="option">
+                    <input type="checkbox" id="video-chapters">
+                    <label for="video-chapters">Embed chapters (if available)</label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Audio Options -->
+              <div id="audio-options" class="options-section" style="display: none;">
+                <h3>Audio Options</h3>
+                <div class="options-grid">
+                  <div class="select-option">
+                    <label for="audio-format">Format:</label>
+                    <select id="audio-format">
+                      <option value="mp3">MP3</option>
+                      <option value="aac">AAC</option>
+                      <option value="flac">FLAC</option>
+                      <option value="ogg">OGG</option>
+                      <option value="m4a">M4A</option>
+                    </select>
+                  </div>
+                  <div class="select-option">
+                    <label for="audio-quality">Quality:</label>
+                    <select id="audio-quality">
+                      <option value="320">320 kbps</option>
+                      <option value="256">256 kbps</option>
+                      <option value="192">192 kbps</option>
+                      <option value="128">128 kbps</option>
+                      <option value="96">96 kbps</option>
+                      <option value="best">Best Available</option>
+                    </select>
+                  </div>
+                  <div class="option">
+                    <input type="checkbox" id="audio-metadata" checked>
+                    <label for="audio-metadata">Embed metadata (title, artist, etc.)</label>
+                  </div>
+                  <div class="option">
+                    <input type="checkbox" id="audio-thumbnail" checked>
+                    <label for="audio-thumbnail">Add thumbnail as album art</label>
+                  </div>
+                  <div class="option">
+                    <input type="checkbox" id="audio-normalize">
+                    <label for="audio-normalize">Normalize audio volume</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             <button type="submit">Download</button>
           </form>
           <div id="response"></div>
@@ -47,9 +154,9 @@
           <div id="queue-container"></div>
         </section>
 
-        <section id="settings-section">
-          <h2>Settings</h2>
-          <p>Settings will be available in a future version.</p>
+        <section id="history-section" style="display: none">
+          <h2>History (last 100 jobs)</h2>
+          <div id="history-container"></div>
         </section>
       </main>
     </div>
@@ -59,6 +166,8 @@
         <div class="job-info">
           <span class="job-url"></span>
           <span class="job-message"></span>
+          <span class="job-speed"></span>
+          <span class="job-eta"></span>
         </div>
         <div class="job-status"></div>
         <div class="job-progress-container">

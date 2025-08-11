@@ -4,6 +4,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const responseDiv = document.getElementById('response');
   const queueContainer = document.getElementById('queue-container');
   const jobTemplate = document.getElementById('job-template');
+  const historyContainer = document.getElementById('history-container');
+  const submitButton = form.querySelector('button[type="submit"]');
+  
+  // Options elements
+  const videoModeRadio = document.getElementById('video-mode');
+  const audioModeRadio = document.getElementById('audio-mode');
+  const videoOptionsSection = document.getElementById('video-options');
+  const audioOptionsSection = document.getElementById('audio-options');
 
   // Navigation handling
   const navLinks = document.querySelectorAll('.main-nav a');
@@ -28,6 +36,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Show initial section
   showSection('submit-section');
 
+  // Handle mode switching
+  function toggleModeOptions() {
+    const isVideoMode = videoModeRadio.checked;
+    videoOptionsSection.style.display = isVideoMode ? 'block' : 'none';
+    audioOptionsSection.style.display = isVideoMode ? 'none' : 'block';
+  }
+
+  videoModeRadio.addEventListener('change', toggleModeOptions);
+  audioModeRadio.addEventListener('change', toggleModeOptions);
+  
+  // Initialize mode display
+  toggleModeOptions();
+
 
   /**
    * Renders a single job item using the template.
@@ -40,8 +61,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     jobElement.dataset.jobId = job.id;
     jobElement.querySelector('.job-url').textContent = job.url;
-    jobElement.querySelector('.job-status').textContent = job.status;
+    const statusDiv = jobElement.querySelector('.job-status');
+    statusDiv.textContent = job.status;
+    const statusLower = job.status.toLowerCase();
+    statusDiv.className = 'job-status';
+    if (statusLower === 'downloading') statusDiv.classList.add('status-downloading');
+    else if (statusLower === 'processing') statusDiv.classList.add('status-processing');
+    else if (statusLower === 'completed') statusDiv.classList.add('status-completed');
+    else if (statusLower === 'error' || statusLower === 'cancelled') statusDiv.classList.add('status-error');
+
     jobElement.querySelector('.job-message').textContent = job.message || '';
+
+    // Speed / ETA
+    const speedEl = jobElement.querySelector('.job-speed');
+    const etaEl = jobElement.querySelector('.job-eta');
+    speedEl.textContent = job.speed ? `| ${job.speed}` : '';
+    etaEl.textContent = job.eta ? `(ETA: ${job.eta})` : '';
 
     const progressElement = jobElement.querySelector('.job-progress');
     progressElement.value = job.progress || 0;
@@ -62,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
    * @param {object} update - The progress update object from the WebSocket.
    */
   function updateJobInQueue(update) {
+    console.log('hhh WS update', update);
     let jobElement = queueContainer.querySelector(`.job-item[data-job-id='${update.job_id}']`);
 
     const jobData = {
@@ -70,16 +106,50 @@ document.addEventListener('DOMContentLoaded', () => {
       status: update.status,
       progress: update.progress,
       message: update.message,
+      speed: update.speed,
+      eta: update.eta,
     };
 
-    const newElement = renderJob(jobData);
-
     if (jobElement) {
-      // Update existing element
-      jobElement.replaceWith(newElement);
+      // Update fields in place for smoother UI
+      jobElement.querySelector('.job-status').textContent = jobData.status;
+      jobElement.querySelector('.job-message').textContent = jobData.message || '';
+
+      const speedEl = jobElement.querySelector('.job-speed');
+      const etaEl = jobElement.querySelector('.job-eta');
+      speedEl.textContent = jobData.speed ? `| ${jobData.speed}` : '';
+      etaEl.textContent = jobData.eta ? `(ETA: ${jobData.eta})` : '';
+
+      const progressEl = jobElement.querySelector('.job-progress');
+      progressEl.value = jobData.progress || 0;
+      progressEl.style.display = (jobData.progress && jobData.progress > 0) ? 'block' : 'none';
+
+      // Update status colour class
+      const statusDiv = jobElement.querySelector('.job-status');
+      statusDiv.className = 'job-status';
+      const s = jobData.status.toLowerCase();
+      if (s === 'downloading') statusDiv.classList.add('status-downloading');
+      else if (s === 'processing') statusDiv.classList.add('status-processing');
+      else if (s === 'completed') statusDiv.classList.add('status-completed');
+      else if (s === 'error' || s === 'cancelled') statusDiv.classList.add('status-error');
     } else {
-      // Add new element
+      const newElement = renderJob(jobData);
       queueContainer.prepend(newElement);
+    }
+
+    // If terminal, schedule move to history
+    const terminal = ['completed', 'error', 'cancelled'].includes(update.status.toLowerCase());
+    if (terminal) {
+      setTimeout(() => {
+        const el = queueContainer.querySelector(`.job-item[data-job-id='${update.job_id}']`);
+        if (el) {
+          historyContainer.prepend(el);
+          // keep history size reasonable
+          if (historyContainer.children.length > 100) {
+            historyContainer.lastElementChild.remove();
+          }
+        }
+      }, 60000);
     }
   }
 
@@ -117,13 +187,17 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     ws.onmessage = (event) => {
-      try {
-        const update = JSON.parse(event.data);
-        if (update.job_id) {
-          updateJobInQueue(update);
+      if (event.data.trim().startsWith('{')) {
+        try {
+          const update = JSON.parse(event.data);
+          if (update.job_id) {
+            updateJobInQueue(update);
+          }
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error, event.data);
         }
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error, event.data);
+      } else {
+        console.log('hhh WS text', event.data);
       }
     };
 
@@ -138,13 +212,44 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
+   * Collects form options and returns them as an object.
+   */
+  function collectFormOptions() {
+    const isVideoMode = videoModeRadio.checked;
+    const options = {
+      mode: isVideoMode ? 'video' : 'audio',
+    };
+
+    if (isVideoMode) {
+      // Video options
+      options.videoQuality = document.getElementById('video-quality').value;
+      options.embedMetadata = document.getElementById('video-metadata').checked;
+      options.embedSubtitles = document.getElementById('video-subtitles').checked;
+      options.subtitleLanguage = document.getElementById('subtitle-language').value;
+      options.embedChapters = document.getElementById('video-chapters').checked;
+    } else {
+      // Audio options
+      options.audioFormat = document.getElementById('audio-format').value;
+      options.audioQuality = document.getElementById('audio-quality').value;
+      options.embedMetadata = document.getElementById('audio-metadata').checked;
+      options.addThumbnail = document.getElementById('audio-thumbnail').checked;
+      options.normalizeAudio = document.getElementById('audio-normalize').checked;
+    }
+
+    return options;
+  }
+
+  /**
    * Handles form submission to submit a new URL.
    */
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const url = urlInput.value;
+    const options = collectFormOptions();
+    
     responseDiv.textContent = 'Submitting...';
     responseDiv.className = 'message';
+    submitButton.disabled = true;
 
     try {
       const response = await fetch('/api/submit', {
@@ -152,9 +257,8 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mediaUrl: url,
-          // Placeholder for future advanced options
           outputDir: null,
-          processingOptions: [],
+          downloadOptions: options,
         }),
       });
 
@@ -173,13 +277,16 @@ document.addEventListener('DOMContentLoaded', () => {
         responseDiv.textContent = `Job submitted successfully! Job ID: ${result.job_id}`;
         responseDiv.className = 'message success';
         urlInput.value = ''; // Clear input field
+        submitButton.disabled = false;
       } else {
         responseDiv.textContent = `Error: ${result.error || 'Unknown error'}`;
         responseDiv.className = 'message error';
+        submitButton.disabled = false;
       }
     } catch (error) {
       responseDiv.textContent = `Network Error: ${error.message}`;
       responseDiv.className = 'message error';
+      submitButton.disabled = false;
     }
   });
 

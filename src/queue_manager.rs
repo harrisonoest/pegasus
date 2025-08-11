@@ -217,6 +217,8 @@ impl DownloadQueue {
                 status: status.to_string(),
                 progress: job.progress, // Use the last known progress
                 message: message.unwrap_or_else(|| status.to_string()),
+                speed: None,
+                eta: None,
             };
 
             if self.progress_sender.send(update).is_err() {
